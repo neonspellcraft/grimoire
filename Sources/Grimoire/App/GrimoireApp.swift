@@ -4,6 +4,8 @@ import AppKit
 @MainActor
 enum GrimoireMain {
     static func main() {
+        // Headless developer tool: render a scene against a track to PNGs, then exit (see SceneRenderTool).
+        if SceneRenderTool.runIfRequested() { return }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate

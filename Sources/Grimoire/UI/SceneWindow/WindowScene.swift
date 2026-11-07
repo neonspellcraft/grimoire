@@ -22,12 +22,14 @@ enum WindowSceneKind: String, CaseIterable {
     case threeBody
     case viewscreen
     case spellrun
+    case splatter
 
     var title: String {
         switch self {
         case .threeBody: "Three-Body"
         case .viewscreen: "Viewscreen"
         case .spellrun: "Spellrun"
+        case .splatter: "Splatter"
         }
     }
 
@@ -37,6 +39,7 @@ enum WindowSceneKind: String, CaseIterable {
         case .threeBody: "New Orbit"
         case .viewscreen: "New Course"
         case .spellrun: "New World"
+        case .splatter: "Fresh Canvas"
         }
     }
 
@@ -46,6 +49,14 @@ enum WindowSceneKind: String, CaseIterable {
         case .threeBody: try ThreeBodyScene(device: device, colorPixelFormat: colorPixelFormat)
         case .viewscreen: try ViewscreenScene(device: device, colorPixelFormat: colorPixelFormat)
         case .spellrun: try SpellrunScene(device: device, colorPixelFormat: colorPixelFormat)
+        case .splatter: try SplatterScene(device: device, colorPixelFormat: colorPixelFormat)
         }
+    }
+}
+
+extension SIMD4 where Scalar == Float {
+    /// Packs a 2D position with two extra values, the usual shape of per-instance data handed to the shaders.
+    init(_ xy: SIMD2<Float>, _ z: Float, _ w: Float) {
+        self.init(xy.x, xy.y, z, w)
     }
 }

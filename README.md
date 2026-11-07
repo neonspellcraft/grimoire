@@ -74,3 +74,23 @@ The world cycles through four biomes (Sunlit Meadow, Dusk Forest, Crystal Cavern
 
 To try it on real music: `SPELLRUN_TRACK=/path/to/song.aiff SPELLRUN_FRAMES=/some/folder swift test --filter SpellrunMusicTests`. It runs the track through the app's band analysis, reports what the music triggered, and saves a frame every 10 s.
 
+**Splatter** (`SplatterScene`) throws neon paint at a black canvas, and every splat is shaped by a piece of theoretical physics. Each one draws fresh continuous random parameters (phases, spectra, quantum numbers, chaotic initial conditions, rotation and a per-splat color blend), so no two are ever the same.
+
+| Theory | Splat |
+|---|---|
+| Superstring harmonics | The rim is a closed string vibrating in 6–16 overtones with random phases and spectral tilt. Droplets fly out along the strongest harmonic. |
+| Quantum orbital | Lobes of \|cos mθ\|^p, sometimes with a radial node. Its droplets are sampled from a hydrogen-like \|ψ\|². |
+| Einstein ring | A lensed ring that thickens into two bright arcs, with a central source and secondary arc images. |
+| Cosmic inflation | A thresholded Gaussian random field with power-law speckles. |
+| Kerr black hole | Logarithmic spiral arms twisted by frame dragging, with matter streaming off them. |
+| Lorenz attractor | A chaotic orbit with randomized ρ, β and starting point, drawn in droplets. |
+| Feynman diagram | Two vertices joined by a wavy photon propagator, fermion legs, and sometimes a vacuum-polarization loop. |
+| Double slit | Droplets landing in cos² fringes under a sinc² envelope. |
+| Brownian fractal | Branching random-walk fingers, like diffusion-limited aggregation. |
+
+**Low** kicks throw the heavy cosmic ones. **Mid** hits throw the quantum and particle ones, and the mids also pull drips down the canvas and drift the color group. **Highs** throw Lorenz attractors, double-slit fringes, brush flicks and a speckle mist. The same theory is never thrown twice in a row. Paint glistens while wet, dries darker and slowly fades, and a drop pours four theories at once. The neon bloom comes cheaply from the canvas's own mipmaps and pulses with the bass. Swatches live in `SplatterPalette`.
+
+### Rendering scenes without a window
+
+`Grimoire --render-scene <scene> --track song.aiff --out frames/ [--seconds 40] [--every 5] [--size 1280x800]` plays a track through the real band analysis and a real scene offscreen, saving PNG frames. Scene names are the `WindowSceneKind` raw values: `threeBody`, `viewscreen`, `spellrun` and `splatter`. Use the debug binary from `swift build --show-bin-path`, or `build/Grimoire.app/Contents/MacOS/Grimoire`.
+
