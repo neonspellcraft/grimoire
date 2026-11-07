@@ -9,8 +9,8 @@ MP3, WAV, AIFF, FLAC and .m3u playlists are supported.
 
 Main window
   Click the prompt to search the playlist; Enter plays the match, Esc clears it.
-  Click or drag the seek line and the volume; scroll the list; drag rows to reorder; double-click to play;
-  the x on the selected row removes it.
+  Click or drag the seek line and the volume; scroll the list; drag rows to reorder; double-click to play.
+  Ctrl-click selects several tracks, Shift-click a range; the x on a selected row (or Delete) removes them.
   The gear button opens settings: keyboard shortcuts, the visualizer scene, band meters and reseed.
   Ctrl+Q quits. The keyboard's media keys and the Windows media overlay work too.
 

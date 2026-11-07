@@ -39,7 +39,7 @@ pub enum Action {
     Open,
     /// A playlist row, by index into `View::rows`.
     Row(usize),
-    /// The × on the selected row: remove that track.
+    /// The × on a selected row: remove the selection.
     RemoveRow(usize),
     List,
     /// Opens or closes the settings panel (it takes the playlist's place).
@@ -298,12 +298,12 @@ fn draw_settings(settings: &SettingsView, screen: &mut Screen<Action>, first: u1
     let help: &[&str] = if settings.shortcuts {
         &[
             "space play/pause · ←/→ seek (shift 30 s) · ↑/↓ select",
-            "enter play · delete or × remove · type to search",
+            "enter play · delete or × removes the selection · type to search",
             "⌘/ctrl ←/→ prev/next · o open · v visualizer",
             "visualizer: 1–4 or tab scenes · r reseed · m meters · f full",
         ]
     } else {
-        &["shortcuts are off: click the prompt to search", "⌘/ctrl+q quits · esc leaves full screen · × removes a track"]
+        &["shortcuts are off: click the prompt to search", "⌘/ctrl+q quits · esc leaves full screen · × removes the selection"]
     };
     for (i, text) in help.iter().enumerate() {
         let y = row + 1 + i as u16;

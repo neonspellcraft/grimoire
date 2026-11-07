@@ -18,7 +18,7 @@ use crate::library::{format_line, matches, Library};
 use crate::scenes::SceneKind;
 use crate::ui::layout::{self, list_rows, MIN_COLS, MIN_ROWS};
 use crate::ui::screen::CellRect;
-use crate::ui::{Action, Effects, RowView, Screen, SettingsView, UiRenderer, View};
+use crate::ui::{Action, Effects, RowView, Screen, Selection, SettingsView, UiRenderer, View};
 
 /// What the main window asks of the app.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -55,7 +55,7 @@ pub struct MainWindow {
     prompt: String,
     prompt_focused: bool,
     pub show_remaining: bool,
-    selected: Option<TrackId>,
+    selection: Selection,
     scroll: usize,
     /// The rows on screen, top to bottom, so a click on row i finds its track.
     visible: Vec<TrackId>,
@@ -91,7 +91,7 @@ impl MainWindow {
             prompt: String::new(),
             prompt_focused: false,
             show_remaining: false,
-            selected: None,
+            selection: Selection::default(),
             scroll: 0,
             visible: Vec::new(),
             filtered: Vec::new(),
@@ -199,7 +199,7 @@ impl MainWindow {
                     title: track.display_title().to_lowercase(),
                     duration: track.duration,
                     current: Some(track.id) == current_id,
-                    selected: Some(track.id) == self.selected,
+                    selected: self.selection.contains(track.id),
                 }
             })
             .collect();
@@ -361,20 +361,29 @@ impl MainWindow {
             Action::Open => self.open_dialog(library),
             Action::Row(i) => {
                 if let Some(&id) = self.visible.get(i) {
-                    self.selected = Some(id);
-                    if double {
-                        library.play(id);
-                    } else if self.prompt.is_empty() {
-                        // Only the full list can be reordered; a filtered one would move tracks unpredictably.
-                        self.drag = Some(Drag::Row(id));
+                    let command = if cfg!(target_os = "macos") { self.modifiers.super_key() } else { self.modifiers.control_key() };
+                    if command {
+                        self.selection.toggle(id, &self.filtered);
+                    } else if self.modifiers.shift_key() {
+                        self.selection.range_to(id, &self.filtered);
+                    } else {
+                        self.selection.only(id);
+                        if double {
+                            library.play(id);
+                        } else if self.prompt.is_empty() {
+                            // Only the full list can be reordered; a filtered one would move tracks unpredictably.
+                            self.drag = Some(Drag::Row(id));
+                        }
                     }
                 }
             }
-            Action::List => self.selected = None,
+            Action::List => self.selection.clear(),
             Action::RemoveRow(i) => {
+                // The × on a selected row removes the whole selection.
                 if let Some(&id) = self.visible.get(i) {
-                    library.remove(&HashSet::from([id]));
-                    self.selected = None;
+                    let doomed = if self.selection.contains(id) { self.selection.tracks.clone() } else { HashSet::from([id]) };
+                    library.remove(&doomed);
+                    self.selection.clear();
                 }
             }
             Action::Settings => self.settings_open = !self.settings_open,
@@ -470,8 +479,9 @@ impl MainWindow {
             Key::Named(NamedKey::Escape) => self.prompt.clear(),
             Key::Named(NamedKey::Enter) => self.play_selection(library),
             Key::Named(NamedKey::Backspace | NamedKey::Delete) => {
-                if let Some(id) = self.selected.take() {
-                    library.remove(&HashSet::from([id]));
+                if !self.selection.is_empty() {
+                    library.remove(&self.selection.tracks);
+                    self.selection.clear();
                 }
             }
             Key::Named(NamedKey::ArrowDown) => self.move_selection(1),
@@ -485,7 +495,7 @@ impl MainWindow {
                     self.prompt.push_str(text);
                     self.prompt_focused = true;
                     self.scroll = 0;
-                    self.selected = None;
+                    self.selection.clear();
                 }
             }
         }
@@ -514,7 +524,7 @@ impl MainWindow {
                 if let Some(text) = event.text.as_ref().filter(|t| t.chars().all(|c| !c.is_control())) {
                     self.prompt.push_str(text);
                     self.scroll = 0;
-                    self.selected = None;
+                    self.selection.clear();
                 }
             }
         }
@@ -522,10 +532,10 @@ impl MainWindow {
 
     /// Plays the selected row if it's on screen, otherwise the first match.
     fn play_selection(&mut self, library: &mut Library) {
-        let target = self.selected.filter(|id| self.visible.contains(id)).or(self.visible.first().copied());
+        let target = self.selection.anchor.filter(|id| self.visible.contains(id)).or(self.visible.first().copied());
         if let Some(id) = target {
             library.play(id);
-            self.selected = Some(id);
+            self.selection.only(id);
         }
     }
 
@@ -534,11 +544,11 @@ impl MainWindow {
         if self.filtered.is_empty() {
             return;
         }
-        let index = match self.selected.and_then(|id| self.filtered.iter().position(|&f| f == id)) {
+        let index = match self.selection.anchor.and_then(|id| self.filtered.iter().position(|&f| f == id)) {
             None => self.scroll,
             Some(i) => (i as i64 + step).clamp(0, self.filtered.len() as i64 - 1) as usize,
         };
-        self.selected = Some(self.filtered[index]);
+        self.selection.only(self.filtered[index]);
         if index < self.scroll {
             self.scroll = index;
         } else if index >= self.scroll + self.capacity.max(1) {
