@@ -1,5 +1,6 @@
 //! Full-window GPU visualizer scenes (port of `Sources/Grimoire/UI/SceneWindow`).
 
+mod animation;
 mod doom;
 mod splatter;
 mod spellrun;
@@ -8,6 +9,7 @@ mod viewscreen;
 
 use grimoire_core::BandLevels;
 
+pub use animation::AnimationScene;
 pub use doom::DoomScene;
 pub use spellrun::SpellrunScene;
 pub use splatter::SplatterScene;
@@ -62,13 +64,22 @@ pub enum SceneKind {
     Viewscreen,
     Spellrun,
     Splatter,
+    /// The user's looping wizard animation (doesn't follow the music).
+    Wizard,
     /// A game rather than a visualizer: Freedoom on the Doom engine, played with the keyboard or a controller.
     Doom,
 }
 
 impl SceneKind {
-    pub const ALL: [SceneKind; 5] =
-        [SceneKind::ThreeBody, SceneKind::Viewscreen, SceneKind::Spellrun, SceneKind::Splatter, SceneKind::Doom];
+    /// In menu order. Doom always stays last.
+    pub const ALL: [SceneKind; 6] = [
+        SceneKind::ThreeBody,
+        SceneKind::Viewscreen,
+        SceneKind::Spellrun,
+        SceneKind::Splatter,
+        SceneKind::Wizard,
+        SceneKind::Doom,
+    ];
 
     /// Doom doesn't follow the music, can't be rendered offscreen and has no "reseed".
     pub fn is_game(self) -> bool {
@@ -82,6 +93,7 @@ impl SceneKind {
             SceneKind::Viewscreen => "viewscreen",
             SceneKind::Spellrun => "spellrun",
             SceneKind::Splatter => "splatter",
+            SceneKind::Wizard => "wizard",
             SceneKind::Doom => "doom",
         }
     }
@@ -96,6 +108,7 @@ impl SceneKind {
             SceneKind::Viewscreen => "Viewscreen",
             SceneKind::Spellrun => "Spellrun",
             SceneKind::Splatter => "Splatter",
+            SceneKind::Wizard => "Wizard",
             SceneKind::Doom => "Doom",
         }
     }
@@ -107,6 +120,7 @@ impl SceneKind {
             SceneKind::Viewscreen => "New Course",
             SceneKind::Spellrun => "New World",
             SceneKind::Splatter => "Fresh Canvas",
+            SceneKind::Wizard => "From the Top",
             SceneKind::Doom => "",
         }
     }
@@ -117,6 +131,7 @@ impl SceneKind {
             SceneKind::Viewscreen => Ok(Box::new(ViewscreenScene::new(device, format))),
             SceneKind::Splatter => Ok(Box::new(SplatterScene::new(device, format))),
             SceneKind::Spellrun => Ok(Box::new(SpellrunScene::new(device, format))),
+            SceneKind::Wizard => Ok(Box::new(AnimationScene::new(device, format, &animation::wizard_file()?)?)),
             SceneKind::Doom => Ok(Box::new(DoomScene::new(device, format)?)),
         }
     }

@@ -50,6 +50,7 @@ jobs:
           Copy-Item target/release/grimoire.exe dist/Grimoire/
           Copy-Item packaging/windows/README.txt dist/Grimoire/
           Copy-Item crates/grimoire-doom/freedoom/freedoom1.wad dist/Grimoire/
+          Copy-Item crates/grimoire-app/assets/animations/wizard.grma dist/Grimoire/
           Copy-Item crates/grimoire-app/assets/fonts/*-OFL.txt dist/Grimoire/licenses/
           Copy-Item crates/grimoire-doom/freedoom/COPYING.txt dist/Grimoire/licenses/Freedoom-COPYING.txt
           Copy-Item ../LICENSE dist/Grimoire/licenses/Grimoire-GPL-2.0.txt

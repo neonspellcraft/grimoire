@@ -304,7 +304,7 @@ fn draw_settings(settings: &SettingsView, screen: &mut Screen<Action>, first: u1
             "space play/pause · ←/→ seek (shift 30 s) · ↑/↓ select",
             "enter play · delete or × removes the selection · type to search",
             "⌘/ctrl ←/→ prev/next · o open · v visualizer",
-            "visualizer: 1–5 or tab scenes · r reseed · m meters · f full",
+            "visualizer: 1–6 or tab scenes · r reseed · m meters · f full",
             "doom: right-click the visualizer to leave it",
         ]
     } else {

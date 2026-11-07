@@ -25,7 +25,9 @@ reaches feature parity.
 The app icon is drawn by `scripts/make-icon.swift` (writes `packaging/icons/` and `assets/icon.png`); the Windows
 `.ico` is made from `packaging/icons/windows-1024.png`.
 
-- Doom: a fifth visualizer that's a game. It plays Freedoom (free game data for the Doom engine, bundled with the
+- Wizard: a visualizer that plays the looping wizard animation (it doesn't follow the music). The video is turned
+  into a frame animation by `scripts/make-animation.sh` (crops black bars, keeps the frame rate).
+- Doom: always the last visualizer, and a game. It plays Freedoom (free game data for the Doom engine, bundled with the
   app) with the keyboard or a USB/Bluetooth controller. Its sound is off by default (⚙ → doom sound), its music isn't
   implemented, and choosing Quit in its menu returns to the previous visualizer.
 
@@ -44,7 +46,7 @@ menu, and in the visualizer for scenes, reseed, band meters and full screen. ⚙
 
 Keyboard shortcuts are on by default and can be turned off in settings: Space play/pause, ←/→ seek (Shift for 30 s),
 ↑/↓ select, Enter play, Delete removes, type anywhere to search, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open,
-⌘/Ctrl+V visualizer; in the visualizer window 1–5 or Tab switch scenes, R reseed, M band meters, F full screen.
+⌘/Ctrl+V visualizer; in the visualizer window 1–6 or Tab switch scenes, R reseed, M band meters, F full screen.
 Double-click the visualizer for full screen and Esc to leave it either way.
 
 Doom: classic keys (arrows, Ctrl fire, Space use, Shift run, Alt or `,`/`.` strafe, Esc menu, Tab map, 1–7 weapons)

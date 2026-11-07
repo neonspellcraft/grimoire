@@ -18,9 +18,12 @@ Main window
 Keyboard shortcuts (on by default; can be turned off in settings)
   Space play/pause, Left/Right seek 5 s (Shift: 30 s), Up/Down select, Enter play, Delete removes,
   type anywhere to search, Ctrl+Left/Right previous/next, Ctrl+O open files, Ctrl+V visualizer window.
-  Visualizer window: 1-4 or Tab switch scenes, R reseed, M band meters, F full screen.
+  Visualizer window: 1-6 or Tab switch scenes, R reseed, M band meters, F full screen.
 
-Doom (the fifth visualizer)
+Wizard
+  A looping animation of a wizard reading a glowing grimoire. It doesn't follow the music.
+
+Doom (the last visualizer)
   A game rather than a visualizer: Freedoom on the Doom engine. Keyboard: arrows or WASD move, Ctrl fires,
   Space uses, Shift runs, Esc is the menu. Controllers: left stick moves, right stick turns, A or the right
   trigger fires, B uses, Start is the menu. Its sound is off unless you turn on "doom sound" in settings.

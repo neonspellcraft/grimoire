@@ -1,5 +1,5 @@
 //! The visualizer window (port of `SceneHostView`): one full-window scene driven by the shared audio feed.
-//! Drag to move, double-click for full screen; 1–5 or Tab switch scenes, R reseed, M band meters, F full screen,
+//! Drag to move, double-click for full screen; 1–6 or Tab switch scenes, R reseed, M band meters, F full screen,
 //! Space play/pause. While Doom is showing, every key goes to the game instead.
 
 use std::time::{Duration, Instant};
@@ -185,7 +185,7 @@ impl VisWindow {
                 "f" => self.toggle_fullscreen(),
                 "m" => self.show_meters = !self.show_meters,
                 "r" => self.scene.reseed(),
-                digit @ ("1" | "2" | "3" | "4" | "5") => {
+                digit @ ("1" | "2" | "3" | "4" | "5" | "6") => {
                     let index = digit.parse::<usize>().unwrap() - 1;
                     self.select(gpu, SceneKind::ALL[index]);
                 }
