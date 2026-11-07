@@ -21,18 +21,30 @@ Requires macOS 14+.
 - **Space** plays/pauses, **← / →** seek 5 s, **⌘O** opens files, **⌘⇧O** opens a folder, **⌘L** shows/hides the playlist, **⌘S** saves the playlist.
 - Click the time to switch between elapsed and remaining.
 - Click the visualizer to cycle **Spectrum → Oscilloscope → Off**, or right-click it / use Window → Visualization.
+- **VIS** (or **⌘⇧V**) opens the visualizer window. Resize it, drag it anywhere, and double-click for full screen. Right-click it for scene options, a new orbit and band meters.
 - Drag the playlist away to float it. Drag it back under the main window to dock it.
 - Media keys and Control Center work. The playlist is restored on the next launch.
 
 ## Layout
 
-- `Sources/GrimoireCore` contains pure logic (playlist, m3u, FLAC tags, time math, FFT bands, bar motion) and is unit tested.
+- `Sources/GrimoireCore` contains pure logic (playlist, m3u, FLAC tags, time math, FFT, multiband analysis, three-body physics) and is unit tested.
 - `Sources/Grimoire/Audio` has `PlayerEngine` (AVAudioEngine playback), `AudioTap` (samples for visualizers) and `TrackLoader` (tags).
 - `Sources/Grimoire/Model` has `PlayerController` (app state) and `NowPlaying` (media keys).
-- `Sources/Grimoire/UI` holds the SwiftUI views. `App/` holds windows, menus and the app delegate.
+- `Sources/Grimoire/UI` holds the SwiftUI views, `UI/Visualizers/` the small LCD visualizers and `UI/SceneWindow/` the Metal visualizer window. `App/` holds windows, menus and the app delegate.
 
 ## Visualizers
 
 `AudioTap` captures the player node's output (before volume) into a ring buffer. `VisualizerNSView` pulls a 2,048-sample window on every display refresh and hands it to the active `Visualization`. The view is layer-backed and driven by a display link, so it pauses when nothing is moving.
 
 To add a style, write a class that conforms to `Visualization` (in `UI/Visualizers/`) and add a case to `VisualizationKind`. `SpectrumAnalyzer` and `BarDynamics` in GrimoireCore provide the FFT bands and the classic rise/fall/peak-hold motion.
+
+### Visualizer window
+
+`SceneHostView` (MetalKit) reads the tap through its own `TapReader`. It splits the audio into three bands (**0–120 Hz, 120–800 Hz, 800 Hz–20 kHz**) with `MultibandAnalyzer`, and `BandFollower` smooths them into envelopes and transient hits. The current `WindowScene` gets those values every frame. To add a scene, conform to `WindowScene` and add a case to `WindowSceneKind`.
+
+**Three-Body** (`ThreeBodyScene`) runs a Newtonian three-body simulation (`ThreeBodySystem`). It starts from the figure-eight orbit, and each body belongs to one band:
+- That band's level sets the body's mass.
+- Bass also pumps up gravity, and the mids speed up time.
+- A thermostat and a gentle bowl keep the chaotic dance in frame.
+
+The shader draws the bodies' gravitational field as flowing rings, with feedback trails smeared along the pull of gravity. Bass pulses and zooms the image, the mids swirl it and shift its colors, and the highs add sparkle and a split-color edge.

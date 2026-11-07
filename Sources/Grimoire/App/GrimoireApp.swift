@@ -95,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(item("Toggle Playlist", #selector(togglePlaylist), "l"))
+        windowMenu.addItem(item("Toggle Visualizer Window", #selector(toggleVisualizer), "v", [.command, .shift]))
         windowMenu.addItem(item("Minimize", #selector(minimize), "m"))
         windowMenu.addItem(.separator())
         let visualizationMenu = NSMenu(title: "Visualization")
@@ -137,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleShuffle() { player.toggleShuffle() }
     @objc private func cycleRepeat() { player.cycleRepeat() }
     @objc private func togglePlaylist() { windows.togglePlaylist() }
+    @objc private func toggleVisualizer() { windows.toggleVisualizer() }
     @objc private func minimize() { windows.minimize() }
 
     @objc private func selectVisualization(_ sender: NSMenuItem) {

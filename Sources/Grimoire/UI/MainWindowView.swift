@@ -34,6 +34,7 @@ struct MainWindowView: View {
                 Spacer(minLength: 8)
                 LEDToggle(label: "SHUF", isOn: player.shuffle) { player.toggleShuffle() }
                 LEDToggle(label: repeatLabel, isOn: player.repeatMode != .off) { player.cycleRepeat() }
+                LEDToggle(label: "VIS", isOn: windows.isVisualizerVisible) { windows.toggleVisualizer() }
                 LEDToggle(label: "PL", isOn: windows.isPlaylistVisible) { windows.togglePlaylist() }
             }
         }

@@ -1,5 +1,6 @@
 import XCTest
 @testable import GrimoireCore
+import simd
 
 final class PlaylistTests: XCTestCase {
     private func makePlaylist(_ count: Int) -> Playlist {
@@ -184,5 +185,120 @@ final class BarDynamicsTests: XCTestCase {
         XCTAssertFalse(bars.isSettled)
         for _ in 0..<200 { bars.step(targets: nil, dt: 0.016) }
         XCTAssertTrue(bars.isSettled)
+    }
+}
+
+final class MultibandTests: XCTestCase {
+    private func levels(forSine frequency: Double, sampleRate: Double = 44_100) -> BandLevels {
+        let samples = (0..<2048).map { 0.5 * Float(sin(2 * .pi * frequency * Double($0) / sampleRate)) }
+        return samples.withUnsafeBufferPointer { MultibandAnalyzer().levels(from: $0, sampleRate: sampleRate) }
+    }
+
+    func testEachToneLandsInItsBand() {
+        let bass = levels(forSine: 60)
+        XCTAssertGreaterThan(bass.low, bass.mid)
+        XCTAssertGreaterThan(bass.low, bass.high)
+
+        let mid = levels(forSine: 400)
+        XCTAssertGreaterThan(mid.mid, mid.low)
+        XCTAssertGreaterThan(mid.mid, mid.high)
+
+        let high = levels(forSine: 5000, sampleRate: 96_000)
+        XCTAssertGreaterThan(high.high, high.low)
+        XCTAssertGreaterThan(high.high, high.mid)
+    }
+
+    func testSilenceIsZero() {
+        let silence = [Float](repeating: 0, count: 2048)
+        let result = silence.withUnsafeBufferPointer { MultibandAnalyzer().levels(from: $0, sampleRate: 44_100) }
+        XCTAssertEqual(result, .zero)
+    }
+
+    func testFollowerAutoGainsAndReleases() {
+        var follower = BandFollower()
+        for _ in 0..<60 { follower.step(BandLevels(low: 0.6, mid: 0.6, high: 0.6), dt: 1.0 / 60) }
+        XCTAssertGreaterThan(follower.envelope.low, 0.95, "a steady level should fill the range after auto-gain")
+        for _ in 0..<120 { follower.step(nil, dt: 1.0 / 60) }
+        XCTAssertLessThan(follower.envelope.low, 0.01)
+    }
+
+    func testFollowerDetectsHits() {
+        var follower = BandFollower()
+        for _ in 0..<120 { follower.step(BandLevels(low: 0.2, mid: 0.2, high: 0.2), dt: 1.0 / 60) }
+        XCTAssertEqual(follower.hits.low, 0)
+        follower.step(BandLevels(low: 0.9, mid: 0.2, high: 0.2), dt: 1.0 / 60)
+        XCTAssertEqual(follower.hits.low, 1)
+        XCTAssertEqual(follower.hits.mid, 0)
+    }
+}
+
+final class ThreeBodyTests: XCTestCase {
+    func testFigureEightConservesEnergyAndMomentum() {
+        var system = ThreeBodySystem.figureEight()
+        let start = system.totalEnergy
+        for _ in 0..<(60 * 20) { system.advance(by: 1.0 / 60) }
+        XCTAssertEqual(system.totalEnergy, start, accuracy: abs(start) * 1e-3)
+        XCTAssertLessThan(simd_length(system.momentum), 1e-9)
+    }
+
+    func testFigureEightReturnsAfterOnePeriod() {
+        var system = ThreeBodySystem.figureEight()
+        system.softening = 0
+        let start = system.bodies.map(\.position)
+        system.advance(by: 6.32591398, maxStep: 0.0005)
+        for (body, origin) in zip(system.bodies, start) {
+            XCTAssertLessThan(simd_length(body.position - origin), 0.01)
+        }
+    }
+
+    func testStaysBoundedUnderMusicLikeModulation() {
+        var system = ThreeBodySystem.figureEight()
+        for frame in 0..<(60 * 120) {
+            let t = Double(frame) / 60
+            system.gravity = 1 + 0.9 * abs(sin(t * 7.3))
+            system.setMasses([1 + 0.8 * abs(sin(t * 2.1)), 1 + 0.8 * abs(sin(t * 3.7)), 1 + 0.8 * abs(sin(t * 5.9))])
+            system.advance(by: (0.45 + abs(sin(t))) / 60)
+        }
+        XCTAssertTrue(system.bodies.allSatisfy { $0.position.x.isFinite && $0.position.y.isFinite })
+        XCTAssertLessThan(system.extent, system.wallRadius * 2)
+    }
+}
+
+final class ThreeBodyThermostatTests: XCTestCase {
+    /// Mirrors ThreeBodyScene: softened, gently trapped, energy target scaled with gravity and mass.
+    func testOrbitKeepsItsSizeUnderMusicLikeModulation() {
+        var system = ThreeBodySystem.figureEight()
+        system.softening = 0.15
+        system.trapStrength = 1
+        system.maxKineticEnergy = 30
+        let baseline = system.totalEnergy
+        var extents: [Double] = []
+        for frame in 0..<(60 * 90) {
+            let t = Double(frame) / 60
+            let low = abs(sin(t * 2.3)), mid = abs(sin(t * 1.3)), high = abs(sin(t * 3.1))
+            let masses = [1 + 0.8 * low, 1 + 0.8 * mid, 1 + 0.8 * high]
+            system.gravity = 1 + 0.9 * low
+            system.setMasses(masses)
+            let meanMass = masses.reduce(0, +) / 3
+            system.targetEnergy = baseline * system.gravity * meanMass * meanMass
+            system.advance(by: (0.45 + 0.9 * mid) / 60)
+            if frame > 600 { extents.append(system.extent) }
+        }
+        extents.sort()
+        XCTAssertGreaterThan(extents[extents.count / 10], 0.4, "the orbit should not collapse into a knot")
+        XCTAssertLessThan(extents[extents.count * 9 / 10], system.wallRadius, "no body should be flung to the wall")
+    }
+}
+
+final class BandFollowerRangeTests: XCTestCase {
+    func testDenseLoudSignalStillSwings() {
+        var follower = BandFollower()
+        var lows: [Float] = []
+        for frame in 0..<(60 * 20) {
+            let pulse: Float = frame % 30 < 5 ? 0.95 : 0.8   // loud bed with kicks on top
+            follower.step(BandLevels(low: pulse, mid: 0.8, high: 0.8), dt: 1.0 / 60)
+            if frame > 60 * 10 { lows.append(follower.envelope.low) }
+        }
+        XCTAssertGreaterThan(lows.max()! - lows.min()!, 0.4, "kicks should still move the envelope a lot")
     }
 }

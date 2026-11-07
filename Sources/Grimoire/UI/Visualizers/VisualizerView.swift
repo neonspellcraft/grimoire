@@ -60,11 +60,9 @@ private struct VisualizerLayer: NSViewRepresentable {
     }
 }
 
-/// Layer-backed view that pulls sample windows from the tap on every display refresh and draws the current
-/// `Visualization`.
+/// Layer-backed view that pulls sample windows from the tap (via `TapReader`) on every display refresh and draws
+/// the current `Visualization`.
 ///
-/// The tap fills its buffer in ~100 ms chunks, so this view keeps its own read cursor that advances in real time
-/// and trails the newest sample by about one chunk. That gives smooth motion at the display's frame rate.
 /// The display link pauses once playback stops and the visualization has settled, so idle CPU is zero.
 final class VisualizerNSView: NSView {
     var select: ((VisualizationKind) -> Void)?
@@ -80,16 +78,13 @@ final class VisualizerNSView: NSView {
         didSet { if playing != oldValue { updateDisplayLink() } }
     }
 
-    private let tap: AudioTap
+    private let reader: TapReader
     private var visualization: Visualization?
     private var displayLink: CADisplayLink?
-    private var cursor: Double = 0
-    private var lastWritten = 0
     private var lastTimestamp: CFTimeInterval?
-    private var samples = [Float](repeating: 0, count: 2048)
 
     init(tap: AudioTap) {
-        self.tap = tap
+        reader = TapReader(tap: tap)
         super.init(frame: .zero)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
@@ -126,28 +121,13 @@ final class VisualizerNSView: NSView {
         }
         let dt = lastTimestamp.map { min(max(link.timestamp - $0, 0), 0.1) } ?? 0
         lastTimestamp = link.timestamp
-        let position = tap.position
 
-        var hasWindow = false
-        if playing, position.written >= samples.count {
-            if position.written < lastWritten || cursor > Double(position.written + position.chunk) {
-                cursor = Double(position.written - position.chunk)   // tap was reset (new track)
-            }
-            cursor += dt * position.sampleRate
-            let newest = Double(position.written)
-            cursor = min(max(cursor, newest - 2 * Double(position.chunk)), newest)
-            hasWindow = samples.withUnsafeMutableBufferPointer {
-                tap.copyWindow(endingAt: Int(cursor), into: $0)
-            }
-        }
-        lastWritten = position.written
-
-        if hasWindow {
-            samples.withUnsafeBufferPointer {
-                visualization.update(window: $0, sampleRate: position.sampleRate, dt: dt)
+        if reader.read(dt: dt, playing: playing) {
+            reader.samples.withUnsafeBufferPointer {
+                visualization.update(window: $0, sampleRate: reader.sampleRate, dt: dt)
             }
         } else {
-            visualization.update(window: nil, sampleRate: position.sampleRate, dt: dt)
+            visualization.update(window: nil, sampleRate: reader.sampleRate, dt: dt)
         }
         needsDisplay = true
         if !playing && visualization.isIdle { link.isPaused = true }
