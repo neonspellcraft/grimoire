@@ -8,12 +8,12 @@ This is a personal project, built with [Claude Code](https://claude.com/claude-c
 
 ## Download
 
-**[⬇ Download Grimoire 0.7.0](https://github.com/neonspellcraft/grimoire/releases/latest)** for Mac and Windows:
+**[⬇ Download the latest Grimoire](https://github.com/neonspellcraft/grimoire/releases/latest)** for Mac and Windows:
 
-- **Windows:** [Grimoire-0.7.0-windows-x64.zip](https://github.com/neonspellcraft/grimoire/releases/latest/download/Grimoire-0.7.0-windows-x64.zip). Extract it and run `grimoire.exe`. If Windows says "Windows protected your PC", click **More info → Run anyway**.
-- **Mac:** [Grimoire-0.7.0-mac.dmg](https://github.com/neonspellcraft/grimoire/releases/latest/download/Grimoire-0.7.0-mac.dmg) (Apple Silicon and Intel). Drag Grimoire to Applications. The first time, use **System Settings → Privacy & Security → Open Anyway**.
+- **Windows:** [Grimoire-windows-x64.zip](https://github.com/neonspellcraft/grimoire/releases/latest/download/Grimoire-windows-x64.zip). Extract it and run `grimoire.exe` (keep the other files beside it). If Windows says "Windows protected your PC", click **More info → Run anyway**.
+- **Mac:** [Grimoire-mac.dmg](https://github.com/neonspellcraft/grimoire/releases/latest/download/Grimoire-mac.dmg) (Apple Silicon and Intel). Drag Grimoire to Applications. The first time, use **System Settings → Privacy & Security → Open Anyway**.
 
-Version 0.7.0 is the new cross-platform Grimoire (source on the [`rust-port`](https://github.com/neonspellcraft/grimoire/tree/rust-port/rs) branch). The rest of this page describes the original Swift app.
+The downloads are the new cross-platform Grimoire, with music visualizers, a wizard and a playable Doom (Freedoom). Its source is on the [`rust-port`](https://github.com/neonspellcraft/grimoire/tree/rust-port/rs) branch, under the GNU GPL. The rest of this page describes the original Swift app.
 
 ## Install
 
