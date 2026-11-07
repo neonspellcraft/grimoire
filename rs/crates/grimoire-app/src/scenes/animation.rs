@@ -283,8 +283,10 @@ impl WindowScene for AnimationScene {
         self.paused = Duration::ZERO;
     }
 
-    fn set_visible(&mut self, visible: bool) {
-        match (visible, self.hidden_since) {
+    // Not `set_visible`: that also turns false when another window has focus, which would freeze the loop
+    // whenever it's picked from the main window.
+    fn set_on_screen(&mut self, on_screen: bool) {
+        match (on_screen, self.hidden_since) {
             (false, None) => self.hidden_since = Some(Instant::now()),
             (true, Some(since)) => {
                 self.paused += since.elapsed();

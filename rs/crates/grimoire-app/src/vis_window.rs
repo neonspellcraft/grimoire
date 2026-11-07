@@ -74,9 +74,11 @@ impl VisWindow {
         })
     }
 
-    /// Games pause unless the window is showing and focused (so keys typed elsewhere don't play them).
+    /// Games pause unless the window is showing and focused (so keys typed elsewhere don't play them);
+    /// loops like the Wizard only pause while the window is hidden.
     fn update_visibility(&mut self) {
         self.scene.set_visible(self.focused && !self.occluded);
+        self.scene.set_on_screen(!self.occluded);
     }
 
     pub fn set_doom_controls(&mut self, controls: &crate::doom_controls::DoomControls) {

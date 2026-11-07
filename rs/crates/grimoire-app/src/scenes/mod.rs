@@ -54,6 +54,8 @@ pub trait WindowScene {
     fn pad(&mut self, _input: crate::controller::PadInput) {}
     /// Whether the scene is on screen and focused, so a game can pause when it isn't.
     fn set_visible(&mut self, _visible: bool) {}
+    /// Whether the scene's window is on screen at all (focus doesn't matter), so a loop can pause while hidden.
+    fn set_on_screen(&mut self, _on_screen: bool) {}
     /// The scene's own sound effects (Grimoire's setting; off by default).
     fn set_sound(&mut self, _on: bool) {}
     /// Doom's keyboard controls (Grimoire's settings).
