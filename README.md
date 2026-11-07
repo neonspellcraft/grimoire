@@ -1,13 +1,21 @@
 # Grimoire
 
+<img src="Resources/AppIcon-preview.png" width="128" alt="Grimoire icon">
+
 A lightweight retro music player for macOS. Plays MP3, WAV, AIFF and FLAC. Native Swift and has no dependencies.
 
 This is a personal project, built with [Claude Code](https://claude.com/claude-code).
 
+## Install
+
+Run `scripts/make-dmg.sh` to build `dist/Grimoire-<version>.dmg`. Open it and drag **Grimoire** onto **Applications**. The app is universal (Apple Silicon and Intel) and needs macOS 14 or later.
+
+The app isn't signed with an Apple Developer ID, so on a Mac other than the one that built it, macOS blocks the first launch. Try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. The comments at the top of `scripts/make-dmg.sh` explain how to sign and notarize it if you have a Developer ID.
+
 ## Build & run
 
 ```sh
-./bundle.sh            # release build → build/Grimoire.app
+./bundle.sh            # universal release build → build/Grimoire.app
 open build/Grimoire.app
 swift test             # core logic tests
 open Package.swift     # work on it in Xcode
@@ -29,6 +37,7 @@ Requires macOS 14+.
 
 - `Sources/GrimoireCore` contains pure logic (playlist, m3u, FLAC tags, time math, FFT, multiband analysis, three-body physics) and is unit tested.
 - `Sources/Grimoire/Audio` has `PlayerEngine` (AVAudioEngine playback), `AudioTap` (samples for visualizers) and `TrackLoader` (tags).
+- `scripts/` holds `make-dmg.sh` (installer) and `make-icon.swift` (redraws `Resources/AppIcon.icns`).
 - `Sources/Grimoire/Model` has `PlayerController` (app state) and `NowPlaying` (media keys).
 - `Sources/Grimoire/UI` holds the SwiftUI views, `UI/Visualizers/` the small LCD visualizers and `UI/SceneWindow/` the Metal visualizer window. `App/` holds windows, menus and the app delegate.
 
