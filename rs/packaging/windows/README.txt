@@ -1,9 +1,8 @@
 Grimoire for Windows
 ====================
 
-Run grimoire.exe. Keep the other files in this folder next to it. If Windows says "Windows protected your
-PC", click "More info", then "Run anyway". Builds signed by SignPath Foundation show that name as the
-publisher; Windows may still ask for the first few releases while the certificate builds its reputation.
+Run grimoire.exe. Keep the other files in this folder next to it. The app isn't code-signed, so the first
+time (and after each update) Windows may say "Windows protected your PC": click "More info", then "Run anyway".
 
 Add music by dragging audio files or folders onto the window, or click the + in the controls row.
 MP3, WAV, AIFF, FLAC and .m3u playlists are supported.
