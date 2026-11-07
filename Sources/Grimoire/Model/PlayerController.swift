@@ -12,6 +12,7 @@ final class PlayerController {
         static let volume = "volume"
         static let shuffle = "shuffle"
         static let repeatMode = "repeatMode"
+        static let visualization = "visualization"
     }
 
     private(set) var playlist = Playlist()
@@ -28,6 +29,9 @@ final class PlayerController {
             UserDefaults.standard.set(volume, forKey: Keys.volume)
         }
     }
+    var visualization: VisualizationKind {
+        didSet { UserDefaults.standard.set(visualization.rawValue, forKey: Keys.visualization) }
+    }
 
     @ObservationIgnored weak var nowPlaying: NowPlaying?
     @ObservationIgnored private let engine = PlayerEngine()
@@ -36,6 +40,7 @@ final class PlayerController {
     init() {
         let defaults = UserDefaults.standard
         volume = defaults.object(forKey: Keys.volume) as? Double ?? 0.8
+        visualization = defaults.string(forKey: Keys.visualization).flatMap(VisualizationKind.init) ?? .spectrum
         playlist.shuffle = defaults.bool(forKey: Keys.shuffle)
         playlist.repeatMode = defaults.string(forKey: Keys.repeatMode).flatMap(RepeatMode.init) ?? .off
         engine.volume = Float(volume)
@@ -43,6 +48,8 @@ final class PlayerController {
     }
 
     var currentTrack: Track? { playlist.current }
+
+    var audioTap: AudioTap { engine.tap }
 
     var marqueeText: String {
         if let message { return message }

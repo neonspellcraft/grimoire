@@ -52,7 +52,7 @@ struct MainWindowView: View {
     }
 }
 
-/// Big time readout with "ghost" segments behind it, plus the space reserved for the visualizer.
+/// Big time readout with "ghost" segments behind it, with the visualizer underneath.
 private struct LCDDisplay: View {
     let player: PlayerController
 
@@ -79,7 +79,7 @@ private struct LCDDisplay: View {
                 .onTapGesture { player.showRemaining.toggle() }
                 .help("Click to toggle elapsed / remaining")
             }
-            VisualizerSlot()
+            VisualizerView(player: player)
         }
         .padding(8)
         .frame(width: 196, alignment: .topLeading)
@@ -100,23 +100,6 @@ private struct LCDDisplay: View {
             return "-" + TimeFormat.lcd(max(0, player.duration - player.currentTime))
         }
         return " " + TimeFormat.lcd(player.currentTime)
-    }
-}
-
-/// Reserved area for the visualizer milestone. Empty for now: a faint grid and the sigil.
-private struct VisualizerSlot: View {
-    var body: some View {
-        ZStack {
-            VStack(spacing: 4) {
-                ForEach(0..<5, id: \.self) { _ in
-                    Rectangle().fill(Theme.lcdGhost).frame(height: 1)
-                }
-            }
-            Text("✦  ✦  ✦")
-                .font(.system(size: 9))
-                .foregroundStyle(Theme.lcdText.opacity(0.18))
-        }
-        .frame(height: 30)
     }
 }
 

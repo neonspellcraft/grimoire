@@ -96,6 +96,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(item("Toggle Playlist", #selector(togglePlaylist), "l"))
         windowMenu.addItem(item("Minimize", #selector(minimize), "m"))
+        windowMenu.addItem(.separator())
+        let visualizationMenu = NSMenu(title: "Visualization")
+        for kind in VisualizationKind.allCases {
+            let kindItem = item(kind.title, #selector(selectVisualization(_:)), "")
+            kindItem.representedObject = kind.rawValue
+            visualizationMenu.addItem(kindItem)
+        }
+        addSubmenu(visualizationMenu, titled: "Visualization", to: windowMenu)
         addSubmenu(windowMenu, titled: "Window", to: mainMenu)
 
         return mainMenu
@@ -130,4 +138,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func cycleRepeat() { player.cycleRepeat() }
     @objc private func togglePlaylist() { windows.togglePlaylist() }
     @objc private func minimize() { windows.minimize() }
+
+    @objc private func selectVisualization(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let kind = VisualizationKind(rawValue: raw) else { return }
+        player.visualization = kind
+    }
+}
+
+extension AppDelegate: NSMenuItemValidation {
+    /// Checks the active visualization in the menu; everything else stays enabled.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(selectVisualization(_:)) {
+            menuItem.state = (menuItem.representedObject as? String) == player.visualization.rawValue ? .on : .off
+        }
+        return true
+    }
 }

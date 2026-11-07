@@ -119,3 +119,70 @@ final class FLACTagsTests: XCTestCase {
         XCTAssertNotNil(FLACTags.read(from: URL(fileURLWithPath: path))?["TITLE"])
     }
 }
+
+final class SpectrumTests: XCTestCase {
+    private func sine(_ frequency: Double, sampleRate: Double, count: Int = 2048, amplitude: Float = 0.5) -> [Float] {
+        (0..<count).map { amplitude * Float(sin(2 * .pi * frequency * Double($0) / sampleRate)) }
+    }
+
+    private func loudestBand(_ bands: [Float]) -> Int {
+        bands.indices.max { bands[$0] < bands[$1] }!
+    }
+
+    func testSinePeaksInItsBand() {
+        let analyzer = SpectrumAnalyzer()
+        let bands = sine(1000, sampleRate: 44_100).withUnsafeBufferPointer { analyzer.bands(from: $0, sampleRate: 44_100) }
+        XCTAssertEqual(loudestBand(bands), analyzer.bandIndex(for: 1000, sampleRate: 44_100))
+        XCTAssertGreaterThan(bands[loudestBand(bands)], 0.8)
+    }
+
+    func testSilenceIsZero() {
+        let analyzer = SpectrumAnalyzer()
+        let silence = [Float](repeating: 0, count: 2048)
+        let bands = silence.withUnsafeBufferPointer { analyzer.bands(from: $0, sampleRate: 44_100) }
+        XCTAssertEqual(bands, [Float](repeating: 0, count: analyzer.bandCount))
+    }
+
+    func testSameToneSameBandAcrossSampleRates() {
+        let analyzer = SpectrumAnalyzer()
+        for rate in [48_000.0, 96_000.0] {
+            let bands = sine(3000, sampleRate: rate).withUnsafeBufferPointer { analyzer.bands(from: $0, sampleRate: rate) }
+            XCTAssertEqual(loudestBand(bands), analyzer.bandIndex(for: 3000, sampleRate: 44_100), "at \(rate) Hz")
+        }
+    }
+
+    func testLowAndHighTonesLandAtOppositeEnds() {
+        let analyzer = SpectrumAnalyzer()
+        let low = sine(80, sampleRate: 44_100).withUnsafeBufferPointer { analyzer.bands(from: $0, sampleRate: 44_100) }
+        let high = sine(12_000, sampleRate: 44_100).withUnsafeBufferPointer { analyzer.bands(from: $0, sampleRate: 44_100) }
+        XCTAssertLessThan(loudestBand(low), 4)
+        XCTAssertGreaterThan(loudestBand(high), analyzer.bandCount - 4)
+    }
+}
+
+final class BarDynamicsTests: XCTestCase {
+    func testRisesInstantlyAndFallsAtRate() {
+        var bars = BarDynamics(count: 1)
+        bars.step(targets: [0.9], dt: 0.016)
+        XCTAssertEqual(bars.levels[0], 0.9)
+        bars.step(targets: nil, dt: 0.25)
+        XCTAssertEqual(bars.levels[0], 0.9 - 1.6 * 0.25, accuracy: 0.0001)
+    }
+
+    func testPeakHoldsThenFalls() {
+        var bars = BarDynamics(count: 1)
+        bars.step(targets: [1], dt: 0.016)
+        bars.step(targets: nil, dt: 0.3)
+        XCTAssertEqual(bars.peaks[0], 1)
+        bars.step(targets: nil, dt: 0.1)
+        XCTAssertLessThan(bars.peaks[0], 1)
+    }
+
+    func testSettlesToZero() {
+        var bars = BarDynamics(count: 3)
+        bars.step(targets: [1, 0.5, 0.2], dt: 0.016)
+        XCTAssertFalse(bars.isSettled)
+        for _ in 0..<200 { bars.step(targets: nil, dt: 0.016) }
+        XCTAssertTrue(bars.isSettled)
+    }
+}

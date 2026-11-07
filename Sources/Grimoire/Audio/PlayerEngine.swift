@@ -18,6 +18,9 @@ final class PlayerEngine {
     /// Called when the current file finished playing on its own (not after stop or seek).
     var onFinished: (() -> Void)?
 
+    /// Taps the player node (before the volume stage), so visualizers don't shrink when the volume goes down.
+    let tap = AudioTap()
+
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var file: AVAudioFile?
@@ -60,10 +63,12 @@ final class PlayerEngine {
         let file = try AVAudioFile(forReading: url)
         let format = file.processingFormat
         if player.outputFormat(forBus: 0) != format {
+            tap.remove()
             engine.stop()
             engine.disconnectNodeOutput(player)
             engine.connect(player, to: engine.mainMixerNode, format: format)
         }
+        tap.install(on: player)
         self.file = file
 
         let duration = Double(file.length) / format.sampleRate
