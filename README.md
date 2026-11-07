@@ -15,6 +15,10 @@ This is a personal project, built with [Claude Code](https://claude.com/claude-c
 
 The downloads are the new cross-platform Grimoire, with music visualizers, a wizard and a playable Doom (Freedoom). Its source is on the [`rust-port`](https://github.com/neonspellcraft/grimoire/tree/rust-port/rs) branch, under the GNU GPL. The rest of this page describes the original Swift app.
 
+### Code signing
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). Only Windows builds made by this repository's GitHub Actions workflow are signed, and each one is approved by hand by the maintainer ([neonspellcraft](https://github.com/neonspellcraft)). Grimoire doesn't send any data over the network. Details are in the [signing policy](https://github.com/neonspellcraft/grimoire/blob/rust-port/rs/packaging/windows/SIGNING.md).
+
 ## Install
 
 Run `scripts/make-dmg.sh` to build `dist/Grimoire-<version>.dmg`. Open it and drag **Grimoire** onto **Applications**. The app is universal (Apple Silicon and Intel) and needs macOS 14 or later.
