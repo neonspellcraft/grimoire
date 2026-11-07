@@ -318,13 +318,9 @@ impl MainWindow {
             Some(Drag::Row(id)) => self.carry(id, library),
             None => {}
         }
-        let icon = match (self.resize_edge(), self.action_under_pointer().map(|(a, _)| a)) {
-            _ if matches!(self.drag, Some(Drag::Row(_))) => CursorIcon::Grabbing,
-            (Some(direction), _) => CursorIcon::from(direction),
-            (None, Some(Action::Prompt)) => CursorIcon::Text,
-            (None, Some(Action::Drag | Action::List) | None) => CursorIcon::Default,
-            (None, Some(_)) => CursorIcon::Pointer,
-        };
+        // The pointer stays a plain arrow everywhere, except the resize arrows on the window edges (Windows only,
+        // since there the app draws its own frame).
+        let icon = self.resize_edge().map_or(CursorIcon::Default, CursorIcon::from);
         self.surface.window.set_cursor(icon);
     }
 
