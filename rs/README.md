@@ -1,7 +1,7 @@
 # Grimoire, cross-platform (Rust)
 
-The Mac and Windows rewrite of Grimoire. The Swift app in `../Sources` stays the daily player until this one
-reaches feature parity.
+The Mac and Windows rewrite of Grimoire, and now the main app. It replaces the original Swift app in `../Sources`,
+which is kept for reference.
 
 | Crate | What it is | Ported from |
 |---|---|---|
