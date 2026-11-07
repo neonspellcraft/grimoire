@@ -49,6 +49,7 @@ pub enum Action {
     NextScene,
     ToggleMeters,
     Reseed,
+    ToggleDoomSound,
 }
 
 /// What the settings panel shows.
@@ -58,6 +59,7 @@ pub struct SettingsView {
     pub scene: String,
     pub meters: bool,
     pub visualizer_open: bool,
+    pub doom_sound: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -295,13 +297,15 @@ fn draw_settings(settings: &SettingsView, screen: &mut Screen<Action>, first: u1
     line(screen, "band meters", if settings.meters { "on" } else { "off" }, settings.meters, Action::ToggleMeters);
     let reseed = if settings.visualizer_open { "cast" } else { "open ◈ first" };
     line(screen, "reseed the scene", reseed, settings.visualizer_open, Action::Reseed);
+    line(screen, "doom sound", if settings.doom_sound { "on" } else { "off" }, settings.doom_sound, Action::ToggleDoomSound);
 
     let help: &[&str] = if settings.shortcuts {
         &[
             "space play/pause · ←/→ seek (shift 30 s) · ↑/↓ select",
             "enter play · delete or × removes the selection · type to search",
             "⌘/ctrl ←/→ prev/next · o open · v visualizer",
-            "visualizer: 1–4 or tab scenes · r reseed · m meters · f full",
+            "visualizer: 1–5 or tab scenes · r reseed · m meters · f full",
+            "doom: right-click the visualizer to leave it",
         ]
     } else {
         &["shortcuts are off: click the prompt to search", "⌘/ctrl+q quits · esc leaves full screen · × removes the selection"]
@@ -509,7 +513,13 @@ mod tests {
     #[test]
     fn settings_panel_replaces_the_playlist() {
         let mut view = sample_view();
-        view.settings = Some(SettingsView { shortcuts: false, scene: "Three-Body".into(), meters: true, visualizer_open: true });
+        view.settings = Some(SettingsView {
+            shortcuts: false,
+            scene: "Three-Body".into(),
+            meters: true,
+            visualizer_open: true,
+            doom_sound: false,
+        });
         let screen = render(&view, 48, 16);
         assert!(screen.row_text(6).contains(" settings "));
         assert!(screen.row_text(7).contains("keyboard shortcuts") && screen.row_text(7).contains("‹ off ›"));

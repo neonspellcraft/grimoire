@@ -3,6 +3,7 @@ name = "grimoire-audio"
 description = "Grimoire playback: symphonia decoding, rubato resampling, cpal output and a lock-free tap for visualizers."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 grimoire-core.workspace = true

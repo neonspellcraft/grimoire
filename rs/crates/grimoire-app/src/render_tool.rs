@@ -51,6 +51,9 @@ impl RenderRequest {
 }
 
 pub fn run(request: &RenderRequest) -> Result<(), String> {
+    if request.kind.is_game() {
+        return Err(format!("{} is a game, not a visualizer, so it can't be rendered from a track", request.kind.title()));
+    }
     let (mono, rate) = decode_mono(&request.track, request.seconds)?;
     std::fs::create_dir_all(&request.out).map_err(|e| e.to_string())?;
     let mut saved = 0;
@@ -193,6 +196,7 @@ pub fn render_ui_from_args(args: &[String]) -> Option<Result<(), String>> {
                 scene: "Three-Body".into(),
                 meters: false,
                 visualizer_open: true,
+                doom_sound: false,
             });
         }
         let width = (size.first().copied().unwrap_or(520) as f32 * scale) as u32;
@@ -282,7 +286,7 @@ mod tests {
                 (0.4 * kick + 0.1 * (2.0 * std::f64::consts::PI * 440.0 * t).sin() + 0.2 * hat) as f32
             })
             .collect();
-        for kind in SceneKind::ALL {
+        for kind in SceneKind::ALL.into_iter().filter(|k| !k.is_game()) {
             let mut brightest = 0u8;
             let result = render(kind, &mono, rate, 1.0, 320, 200, |_, rgba| {
                 brightest = brightest.max(rgba.chunks_exact(4).map(|p| p[0].max(p[1]).max(p[2])).max().unwrap_or(0));

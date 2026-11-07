@@ -3,6 +3,7 @@ name = "grimoire-core"
 description = "Pure Grimoire logic: playlist, m3u, tags, analysis, physics. No OS or GPU dependencies."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 glam.workspace = true

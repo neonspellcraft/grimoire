@@ -1,14 +1,16 @@
 [workspace]
 resolver = "2"
-members = ["crates/grimoire-core", "crates/grimoire-audio", "crates/grimoire-app"]
+members = ["crates/grimoire-core", "crates/grimoire-audio", "crates/grimoire-doom", "crates/grimoire-app"]
 
 [workspace.package]
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
+license = "GPL-2.0-or-later"
 
 [workspace.dependencies]
 grimoire-core = { path = "crates/grimoire-core" }
 grimoire-audio = { path = "crates/grimoire-audio" }
+grimoire-doom = { path = "crates/grimoire-doom" }
 glam = "0.30"
 
 [profile.release]

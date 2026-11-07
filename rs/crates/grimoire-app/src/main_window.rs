@@ -30,6 +30,7 @@ pub enum Request {
     SetScene(SceneKind),
     SetMeters(bool),
     Reseed,
+    SetDoomSound(bool),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -73,6 +74,7 @@ pub struct MainWindow {
     /// Mirrors of the visualizer's state, for the settings panel.
     pub scene: SceneKind,
     pub show_meters: bool,
+    pub doom_sound: bool,
 }
 
 impl MainWindow {
@@ -105,6 +107,7 @@ impl MainWindow {
             settings_open: false,
             scene: SceneKind::ThreeBody,
             show_meters: false,
+            doom_sound: false,
         };
         window.apply_min_size();
         window
@@ -240,6 +243,7 @@ impl MainWindow {
                 scene: self.scene.title().into(),
                 meters: self.show_meters,
                 visualizer_open: self.visualizer_open,
+                doom_sound: self.doom_sound,
             }),
         }
     }
@@ -406,6 +410,7 @@ impl MainWindow {
             }
             Action::ToggleMeters => return Some(Request::SetMeters(!self.show_meters)),
             Action::Reseed => return Some(Request::Reseed),
+            Action::ToggleDoomSound => return Some(Request::SetDoomSound(!self.doom_sound)),
         }
         None
     }

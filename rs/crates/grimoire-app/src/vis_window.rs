@@ -1,6 +1,6 @@
 //! The visualizer window (port of `SceneHostView`): one full-window scene driven by the shared audio feed.
-//! Drag to move, double-click for full screen; 1–4 or Tab switch scenes, R reseed, M band meters, F full screen,
-//! Space play/pause.
+//! Drag to move, double-click for full screen; 1–5 or Tab switch scenes, R reseed, M band meters, F full screen,
+//! Space play/pause. While Doom is showing, every key goes to the game instead.
 
 use std::time::{Duration, Instant};
 
@@ -8,6 +8,7 @@ use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::Fullscreen;
 
+use crate::controller::PadInput;
 use crate::feed::AudioFeed;
 use crate::gpu::{Gpu, WindowSurface};
 use crate::library::Library;
@@ -25,20 +26,62 @@ pub struct VisWindow {
     /// On by default; turned off, only the mouse (double-click for full screen) and Esc work here.
     pub shortcuts: bool,
     control_down: bool,
+    focused: bool,
+    /// The scene to go back to when a game (Doom) quits.
+    previous: SceneKind,
+    /// Doom's sound effects (Grimoire's setting; off by default).
+    game_sound: bool,
 }
 
 /// Whether the visualizer window wants to close.
 pub struct Close;
 
 impl VisWindow {
-    pub fn new(surface: WindowSurface, gpu: &Gpu, kind: SceneKind, show_meters: bool) -> Result<VisWindow, String> {
+    pub fn new(
+        surface: WindowSurface,
+        gpu: &Gpu,
+        kind: SceneKind,
+        show_meters: bool,
+        game_sound: bool,
+    ) -> Result<VisWindow, String> {
         // Fall back to Three-Body if the saved scene can't be built (e.g. one from a newer build).
-        let (kind, scene) = match kind.make(&gpu.device, surface.view_format) {
+        let (kind, mut scene) = match kind.make(&gpu.device, surface.view_format) {
             Ok(scene) => (kind, scene),
-            Err(_) => (SceneKind::ThreeBody, SceneKind::ThreeBody.make(&gpu.device, surface.view_format)?),
+            Err(e) => {
+                eprintln!("grimoire: couldn't build the {} scene: {e}", kind.title());
+                (SceneKind::ThreeBody, SceneKind::ThreeBody.make(&gpu.device, surface.view_format)?)
+            }
         };
+        scene.set_sound(game_sound);
         surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
-        Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false, shortcuts: true, control_down: false })
+        Ok(VisWindow {
+            surface,
+            kind,
+            scene,
+            show_meters,
+            last_frame: None,
+            last_click: None,
+            occluded: false,
+            shortcuts: true,
+            control_down: false,
+            focused: true,
+            previous: SceneKind::ThreeBody,
+            game_sound,
+        })
+    }
+
+    /// Games pause unless the window is showing and focused (so keys typed elsewhere don't play them).
+    fn update_visibility(&mut self) {
+        self.scene.set_visible(self.focused && !self.occluded);
+    }
+
+    pub fn set_game_sound(&mut self, on: bool) {
+        self.game_sound = on;
+        self.scene.set_sound(on);
+    }
+
+    pub fn pad(&mut self, input: PadInput) {
+        self.scene.pad(input);
     }
 
     /// Swaps in a fresh instance of `kind`; the old scene and its GPU resources are released.
@@ -48,9 +91,14 @@ impl VisWindow {
         }
         match kind.make(&gpu.device, self.surface.view_format) {
             Ok(scene) => {
+                if !self.kind.is_game() {
+                    self.previous = self.kind;
+                }
                 self.scene = scene;
                 self.kind = kind;
                 self.last_frame = None;
+                self.scene.set_sound(self.game_sound);
+                self.update_visibility();
                 self.surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
             }
             Err(e) => eprintln!("grimoire: couldn't build the {} scene: {e}", kind.title()),
@@ -58,6 +106,9 @@ impl VisWindow {
     }
 
     pub fn draw(&mut self, gpu: &Gpu, feed: &AudioFeed) {
+        if self.scene.wants_to_leave() {
+            self.select(gpu, self.previous);
+        }
         let now = Instant::now();
         let dt = self.last_frame.map_or(1.0 / 60.0, |t| (now - t).as_secs_f64().clamp(0.0, 0.1));
         self.last_frame = Some(now);
@@ -76,6 +127,11 @@ impl VisWindow {
             WindowEvent::Occluded(occluded) => {
                 self.occluded = *occluded;
                 self.last_frame = None;
+                self.update_visibility();
+            }
+            WindowEvent::Focused(focused) => {
+                self.focused = *focused;
+                self.update_visibility();
             }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => self.context_menu(gpu),
             WindowEvent::ModifiersChanged(modifiers) => self.control_down = modifiers.state().control_key(),
@@ -103,6 +159,10 @@ impl VisWindow {
     }
 
     fn key(&mut self, event: &KeyEvent, gpu: &Gpu, library: &mut Library) {
+        // A game gets every key, presses and releases; leave it with the right-click menu.
+        if self.kind.is_game() && self.scene.key(event) {
+            return;
+        }
         if event.state != ElementState::Pressed {
             return;
         }
@@ -125,7 +185,7 @@ impl VisWindow {
                 "f" => self.toggle_fullscreen(),
                 "m" => self.show_meters = !self.show_meters,
                 "r" => self.scene.reseed(),
-                digit @ ("1" | "2" | "3" | "4") => {
+                digit @ ("1" | "2" | "3" | "4" | "5") => {
                     let index = digit.parse::<usize>().unwrap() - 1;
                     self.select(gpu, SceneKind::ALL[index]);
                 }
@@ -147,14 +207,15 @@ impl VisWindow {
         for kind in SceneKind::ALL {
             entries.push(Entry::Check(kind.title().into(), kind == self.kind, Command::Scene(kind)));
         }
-        entries.extend([
-            Entry::Separator,
-            Entry::Header(self.kind.title().into()),
-            Entry::Item(self.kind.reseed_title().into(), Command::Reseed),
-            Entry::Check("Show Band Meters".into(), self.show_meters, Command::Meters),
-            Entry::Separator,
-            Entry::Item("Toggle Full Screen".into(), Command::FullScreen),
-        ]);
+        entries.extend([Entry::Separator, Entry::Header(self.kind.title().into())]);
+        if !self.kind.is_game() {
+            entries.extend([
+                Entry::Item(self.kind.reseed_title().into(), Command::Reseed),
+                Entry::Check("Show Band Meters".into(), self.show_meters, Command::Meters),
+                Entry::Separator,
+            ]);
+        }
+        entries.push(Entry::Item("Toggle Full Screen".into(), Command::FullScreen));
         match popup(&self.surface.window, entries) {
             Some(Command::Scene(kind)) => self.select(gpu, kind),
             Some(Command::Reseed) => self.scene.reseed(),

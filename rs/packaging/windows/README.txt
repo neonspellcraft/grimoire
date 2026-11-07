@@ -20,9 +20,16 @@ Keyboard shortcuts (on by default; can be turned off in settings)
   type anywhere to search, Ctrl+Left/Right previous/next, Ctrl+O open files, Ctrl+V visualizer window.
   Visualizer window: 1-4 or Tab switch scenes, R reseed, M band meters, F full screen.
 
+Doom (the fifth visualizer)
+  A game rather than a visualizer: Freedoom on the Doom engine. Keyboard: arrows or WASD move, Ctrl fires,
+  Space uses, Shift runs, Esc is the menu. Controllers: left stick moves, right stick turns, A or the right
+  trigger fires, B uses, Start is the menu. Its sound is off unless you turn on "doom sound" in settings.
+  Right-click the visualizer to switch back to a music visualizer.
+
 Visualizer window (the diamond button)
   Double-click for full screen; Esc leaves it.
 
 Settings and the playlist are saved in %APPDATA%\Grimoire.
 
-The fonts bundled in the app are under the SIL Open Font License; see the licenses folder.
+Grimoire is free software under the GNU GPL v2 or later; Freedoom and the fonts have their own free licenses.
+See the licenses folder.

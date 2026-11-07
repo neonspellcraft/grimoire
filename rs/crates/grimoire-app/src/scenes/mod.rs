@@ -1,5 +1,6 @@
 //! Full-window GPU visualizer scenes (port of `Sources/Grimoire/UI/SceneWindow`).
 
+mod doom;
 mod splatter;
 mod spellrun;
 mod three_body;
@@ -7,6 +8,7 @@ mod viewscreen;
 
 use grimoire_core::BandLevels;
 
+pub use doom::DoomScene;
 pub use spellrun::SpellrunScene;
 pub use splatter::SplatterScene;
 pub use three_body::ThreeBodyScene;
@@ -35,6 +37,23 @@ pub trait WindowScene {
     );
     /// Starts over from a fresh, slightly randomized state.
     fn reseed(&mut self);
+
+    // Games (Doom) use these; the music-driven scenes ignore them.
+
+    /// A key press or release in the visualizer window. True if the scene used it (it then skips shortcuts).
+    fn key(&mut self, _event: &winit::event::KeyEvent) -> bool {
+        false
+    }
+    /// A game controller button or stick moved.
+    fn pad(&mut self, _input: crate::controller::PadInput) {}
+    /// Whether the scene is on screen and focused, so a game can pause when it isn't.
+    fn set_visible(&mut self, _visible: bool) {}
+    /// The scene's own sound effects (Grimoire's setting; off by default).
+    fn set_sound(&mut self, _on: bool) {}
+    /// True once the scene wants to hand the window back (Quit in Doom's menu).
+    fn wants_to_leave(&mut self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,10 +62,18 @@ pub enum SceneKind {
     Viewscreen,
     Spellrun,
     Splatter,
+    /// A game rather than a visualizer: Freedoom on the Doom engine, played with the keyboard or a controller.
+    Doom,
 }
 
 impl SceneKind {
-    pub const ALL: [SceneKind; 4] = [SceneKind::ThreeBody, SceneKind::Viewscreen, SceneKind::Spellrun, SceneKind::Splatter];
+    pub const ALL: [SceneKind; 5] =
+        [SceneKind::ThreeBody, SceneKind::Viewscreen, SceneKind::Spellrun, SceneKind::Splatter, SceneKind::Doom];
+
+    /// Doom doesn't follow the music, can't be rendered offscreen and has no "reseed".
+    pub fn is_game(self) -> bool {
+        self == SceneKind::Doom
+    }
 
     /// Same names the Swift app stores and its `--render-scene` flag takes.
     pub fn raw(self) -> &'static str {
@@ -55,6 +82,7 @@ impl SceneKind {
             SceneKind::Viewscreen => "viewscreen",
             SceneKind::Spellrun => "spellrun",
             SceneKind::Splatter => "splatter",
+            SceneKind::Doom => "doom",
         }
     }
 
@@ -68,6 +96,7 @@ impl SceneKind {
             SceneKind::Viewscreen => "Viewscreen",
             SceneKind::Spellrun => "Spellrun",
             SceneKind::Splatter => "Splatter",
+            SceneKind::Doom => "Doom",
         }
     }
 
@@ -78,6 +107,7 @@ impl SceneKind {
             SceneKind::Viewscreen => "New Course",
             SceneKind::Spellrun => "New World",
             SceneKind::Splatter => "Fresh Canvas",
+            SceneKind::Doom => "",
         }
     }
 
@@ -87,6 +117,7 @@ impl SceneKind {
             SceneKind::Viewscreen => Ok(Box::new(ViewscreenScene::new(device, format))),
             SceneKind::Splatter => Ok(Box::new(SplatterScene::new(device, format))),
             SceneKind::Spellrun => Ok(Box::new(SpellrunScene::new(device, format))),
+            SceneKind::Doom => Ok(Box::new(DoomScene::new(device, format)?)),
         }
     }
 }

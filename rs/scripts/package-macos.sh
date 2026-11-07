@@ -27,6 +27,11 @@ lipo -create "${BINARIES[@]}" -output "$APP/Contents/MacOS/Grimoire"
 cp packaging/icons/Grimoire.icns "$APP/Contents/Resources/AppIcon.icns"
 mkdir -p "$APP/Contents/Resources/licenses"
 cp crates/grimoire-app/assets/fonts/*-OFL.txt "$APP/Contents/Resources/licenses/"
+cp ../LICENSE "$APP/Contents/Resources/licenses/Grimoire-GPL-2.0.txt"
+# Freedoom, the free game the Doom visualizer plays.
+./scripts/fetch-freedoom.sh
+cp crates/grimoire-doom/freedoom/freedoom1.wad "$APP/Contents/Resources/"
+cp crates/grimoire-doom/freedoom/COPYING.txt "$APP/Contents/Resources/licenses/Freedoom-COPYING.txt"
 # No CFBundleDocumentTypes: winit can't receive Finder's "Open With" events yet, so files are opened by dropping
 # them on the window or with the + button instead.
 cat > "$APP/Contents/Info.plist" <<PLIST

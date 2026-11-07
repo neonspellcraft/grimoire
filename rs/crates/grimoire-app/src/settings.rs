@@ -27,6 +27,8 @@ pub struct Settings {
     pub show_meters: bool,
     /// Keyboard shortcuts beyond quitting and editing the prompt. On unless turned off in settings.
     pub keyboard_shortcuts: bool,
+    /// Doom's sound effects. Off by default: Grimoire is usually playing music.
+    pub doom_sound: bool,
 }
 
 impl Default for Settings {
@@ -47,6 +49,7 @@ impl Default for Settings {
             scene: "threeBody".into(),
             show_meters: false,
             keyboard_shortcuts: true,
+            doom_sound: false,
         }
     }
 }
@@ -112,5 +115,6 @@ mod tests {
         assert_eq!(old.volume, 0.5);
         assert_eq!(old.scene, "threeBody");
         assert!(old.keyboard_shortcuts, "shortcuts start on");
+        assert!(!old.doom_sound, "Doom's sound starts off");
     }
 }

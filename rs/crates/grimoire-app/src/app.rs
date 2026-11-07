@@ -11,6 +11,7 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowAttributes, WindowId};
 
+use crate::controller::Controllers;
 use crate::feed::AudioFeed;
 use crate::gpu::{Gpu, WindowSurface};
 use crate::library::Library;
@@ -47,6 +48,7 @@ struct Running {
     vis: Option<VisWindow>,
     library: Library,
     now_playing: Option<NowPlaying>,
+    controllers: Controllers,
     feed: AudioFeed,
     settings: Settings,
     last_save: Instant,
@@ -111,6 +113,14 @@ impl ApplicationHandler for App {
                     }
                     app.library.dirty = true;
                 }
+                Some(Request::SetDoomSound(on)) => {
+                    app.settings.doom_sound = on;
+                    app.main.doom_sound = on;
+                    if let Some(vis) = &mut app.vis {
+                        vis.set_game_sound(on);
+                    }
+                    app.library.dirty = true;
+                }
                 Some(Request::Reseed) => {
                     if let Some(vis) = &mut app.vis {
                         vis.reseed();
@@ -132,6 +142,12 @@ impl ApplicationHandler for App {
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let Some(app) = &mut self.running else { return };
         app.library.tick();
+        // Controllers only ever drive the visualizer's game (Doom).
+        for input in app.controllers.poll() {
+            if let Some(vis) = &mut app.vis {
+                vis.pad(input);
+            }
+        }
         if let Some(now_playing) = &mut app.now_playing {
             now_playing.tick(&mut app.library);
         }
@@ -183,6 +199,7 @@ impl Running {
         let mut main = MainWindow::new(surface, &gpu);
         main.show_remaining = settings.show_remaining;
         main.shortcuts = settings.keyboard_shortcuts;
+        main.doom_sound = settings.doom_sound;
 
         let mut library = Library::new();
         if paths.is_empty() {
@@ -197,6 +214,7 @@ impl Running {
             gpu,
             main,
             now_playing,
+            controllers: Controllers::new(),
             vis: None,
             library,
             feed: AudioFeed::default(),
@@ -249,7 +267,7 @@ impl Running {
             .and_then(|window| WindowSurface::new(&self.instance, Some(&self.gpu), Arc::new(window)))
             .and_then(|(surface, _)| {
                 let kind = SceneKind::from_raw(&self.settings.scene).unwrap_or(SceneKind::ThreeBody);
-                VisWindow::new(surface, &self.gpu, kind, self.settings.show_meters)
+                VisWindow::new(surface, &self.gpu, kind, self.settings.show_meters, self.settings.doom_sound)
             });
         match opened {
             Ok(mut vis) => {
