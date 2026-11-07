@@ -38,4 +38,8 @@ fn main() {
         build.file(format!("doomgeneric/{name}.c"));
     }
     build.compile("doomgeneric");
+    // The engine's fatal-error dialog (I_Error) uses MessageBoxW on Windows.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        println!("cargo:rustc-link-lib=user32");
+    }
 }
