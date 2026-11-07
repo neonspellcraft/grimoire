@@ -8,7 +8,7 @@ reaches feature parity.
 | `grimoire-core` | Playlist, m3u, FLAC tags, time math, spectrum and band analysis, three-body physics, the Spellrun game and its pixel renderer | `Sources/GrimoireCore` |
 | `grimoire-audio` | symphonia decoding, rubato resampling, cpal output (CoreAudio / WASAPI), visualizer tap | `Sources/Grimoire/Audio` |
 | `grimoire-doom` | The Doom engine (doomgeneric, GPL-2.0) embedded: frames out, keys in, sound effects | id Software's GPL release, via doomgeneric |
-| `grimoire-app` | The terminal main window, the four wgpu scenes (Metal / Direct3D 12), media keys, settings, the render tools | `Sources/Grimoire/UI`, `Sources/Grimoire/Model` |
+| `grimoire-app` | The terminal main window, the eight wgpu scenes (Metal / Direct3D 12), media keys, settings, the render tools | `Sources/Grimoire/UI`, `Sources/Grimoire/Model` |
 
 ## Status
 - Milestone 1: core logic with all the Swift tests ported; playback of MP3, WAV, AIFF and FLAC with sample-accurate
@@ -20,7 +20,7 @@ reaches feature parity.
 - Milestone 3: all four visualizer scenes (Three-Body, Viewscreen, Spellrun, Splatter), switched with 1–4 or Tab in
   the visualizer window; media keys and Now Playing (macOS Control Center, the Windows media overlay); dragging
   playlist rows to reorder; packaging as a universal macOS DMG and a Windows zip with an embedded icon.
-- Not yet: Finder's "Open With" on macOS (winit doesn't deliver those events), code signing.
+- Not yet: Finder's "Open With" on macOS (winit doesn't deliver those events). The builds stay unsigned by choice.
 
 The app icon is drawn by `scripts/make-icon.swift` (writes `packaging/icons/` and `assets/icon.png`); the Windows
 `.ico` is made from `packaging/icons/windows-1024.png`.
@@ -48,7 +48,7 @@ menu, and in the visualizer for scenes, reseed, band meters and full screen. ⚙
 
 Keyboard shortcuts are on by default and can be turned off in settings: Space play/pause, ←/→ seek (Shift for 30 s),
 ↑/↓ select, Enter play, Delete removes, type anywhere to search, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open,
-⌘/Ctrl+V visualizer; in the visualizer window 1–7 or Tab switch scenes, R reseed, M band meters, F full screen.
+⌘/Ctrl+V visualizer; in the visualizer window 1–8 or Tab switch scenes, R reseed, M band meters, F full screen.
 Double-click the visualizer for full screen and Esc to leave it either way.
 
 Doom: classic keys (arrows, Ctrl fire, Space use, Shift run, Alt or `,`/`.` strafe, Esc menu, Tab map, 1–7 weapons)
