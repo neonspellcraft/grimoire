@@ -22,7 +22,7 @@ use crate::vis_window::VisWindow;
 
 pub const HELP: &str = "\
 Click the prompt to search the playlist; Enter plays the match. ⌘/Ctrl+Q quits. Drop audio files, folders
-or .m3u playlists on either window. Keyboard shortcuts are off by default; turn them on in settings (⚙):
+or .m3u playlists on either window. Keyboard shortcuts (on by default; turn them off in settings ⚙):
 Space play/pause, ←/→ seek (Shift: 30 s), ↑/↓ select, Delete removes, type anywhere to search,
 ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open, ⌘/Ctrl+V visualizer;
 visualizer window: 1–4 or Tab switch scenes, R reseed, M band meters, F full screen.";

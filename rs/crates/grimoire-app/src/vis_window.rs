@@ -21,7 +21,7 @@ pub struct VisWindow {
     last_frame: Option<Instant>,
     last_click: Option<Instant>,
     pub occluded: bool,
-    /// Off by default; then only the mouse (double-click for full screen) and Esc work here.
+    /// On by default; turned off, only the mouse (double-click for full screen) and Esc work here.
     pub shortcuts: bool,
 }
 
@@ -36,7 +36,7 @@ impl VisWindow {
             Err(_) => (SceneKind::ThreeBody, SceneKind::ThreeBody.make(&gpu.device, surface.view_format)?),
         };
         surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
-        Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false, shortcuts: false })
+        Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false, shortcuts: true })
     }
 
     /// Swaps in a fresh instance of `kind`; the old scene and its GPU resources are released.

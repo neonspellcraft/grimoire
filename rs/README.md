@@ -28,10 +28,11 @@ cargo run --release -- --render-ui ui.png        # the main window with sample d
 cargo run --release -- --render-scene threeBody --track song.wav --out frames/ --seconds 20 --every 5
 ```
 Main window: click the prompt to search the playlist, Enter plays the match. Click or drag the seek line and the
-volume, scroll the list or the volume, drag rows to reorder, double-click a row to play it. ⚙ opens settings
+volume, scroll the list or the volume, drag rows to reorder, double-click a row to play it, click the × on the
+selected row to remove it. ⚙ opens settings
 (keyboard shortcuts, visualizer scene, band meters, reseed). ⌘/Ctrl+Q quits.
 
-Keyboard shortcuts are off by default and can be turned on in settings: Space play/pause, ←/→ seek (Shift for 30 s),
+Keyboard shortcuts are on by default and can be turned off in settings: Space play/pause, ←/→ seek (Shift for 30 s),
 ↑/↓ select, Enter play, Delete removes, type anywhere to search, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open,
 ⌘/Ctrl+V visualizer; in the visualizer window 1–4 or Tab switch scenes, R reseed, M band meters, F full screen.
 Double-click the visualizer for full screen and Esc to leave it either way.

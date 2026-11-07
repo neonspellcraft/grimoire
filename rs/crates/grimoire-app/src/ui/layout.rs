@@ -39,6 +39,8 @@ pub enum Action {
     Open,
     /// A playlist row, by index into `View::rows`.
     Row(usize),
+    /// The × on the selected row: remove that track.
+    RemoveRow(usize),
     List,
     /// Opens or closes the settings panel (it takes the playlist's place).
     Settings,
@@ -257,6 +259,10 @@ pub fn layout(view: &View, screen: &mut Screen<Action>) {
         let title = if track.current { glitched(&track.title, view.reveal, view.clock, 3) } else { plain(&track.title) };
         draw_glitched(screen, 8, row, &title, color, duration_start.saturating_sub(10));
         screen.hit(CellRect { x: 1, y: row, w: inner, h: 1 }, Action::Row(i));
+        if track.selected {
+            screen.set(w - 3, row, '×', VIOLET);
+            screen.hit(CellRect { x: w - 4, y: row, w: 3, h: 1 }, Action::RemoveRow(i));
+        }
     }
     if view.rows.is_empty() && visible > 0 {
         let hint = if view.prompt.is_empty() { "drop audio here, or + to summon files" } else { "no spell answers" };
@@ -292,12 +298,12 @@ fn draw_settings(settings: &SettingsView, screen: &mut Screen<Action>, first: u1
     let help: &[&str] = if settings.shortcuts {
         &[
             "space play/pause · ←/→ seek (shift 30 s) · ↑/↓ select",
-            "enter play · delete remove · type to search",
+            "enter play · delete or × remove · type to search",
             "⌘/ctrl ←/→ prev/next · o open · v visualizer",
             "visualizer: 1–4 or tab scenes · r reseed · m meters · f full",
         ]
     } else {
-        &["shortcuts are off: click the prompt to search", "⌘/ctrl+q quits · esc leaves full screen"]
+        &["shortcuts are off: click the prompt to search", "⌘/ctrl+q quits · esc leaves full screen · × removes a track"]
     };
     for (i, text) in help.iter().enumerate() {
         let y = row + 1 + i as u16;
@@ -478,6 +484,10 @@ mod tests {
         assert_eq!(screen.row_text(5).chars().nth(play.x as usize + 1), Some('❚'));
         assert_eq!(screen.hit_test(play.x + 1, 5).map(|h| h.action), Some(Action::PlayPause));
         assert_eq!(screen.hit_test(10, 9).map(|h| h.action), Some(Action::Row(2)));
+        // The selected row (03) has a × that removes it.
+        assert_eq!(screen.row_text(9).chars().nth(45), Some('×'));
+        assert_eq!(screen.hit_test(45, 9).map(|h| h.action), Some(Action::RemoveRow(2)));
+        assert!(!screen.row_text(8).contains('×'));
         assert_eq!(screen.hit_test(20, 0).map(|h| h.action), Some(Action::Drag));
         assert_eq!(screen.hit_test(46, 0).map(|h| h.action), Some(Action::Close));
         let seek = find(Action::Seek);

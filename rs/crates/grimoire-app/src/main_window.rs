@@ -66,7 +66,7 @@ pub struct MainWindow {
     reveal_start: Instant,
     pub visualizer_open: bool,
     occluded: bool,
-    /// Off by default: then only the mouse, the focused prompt, ⌘/Ctrl+Q and Esc (to leave full screen) act.
+    /// On by default. Turned off in settings, only the mouse, the focused prompt, ⌘/Ctrl+Q and Esc act.
     pub shortcuts: bool,
     settings_open: bool,
     /// Mirrors of the visualizer's state, for the settings panel.
@@ -100,7 +100,7 @@ impl MainWindow {
             reveal_start: Instant::now(),
             visualizer_open: false,
             occluded: false,
-            shortcuts: false,
+            shortcuts: true,
             settings_open: false,
             scene: SceneKind::ThreeBody,
             show_meters: false,
@@ -375,6 +375,12 @@ impl MainWindow {
                 }
             }
             Action::List => self.selected = None,
+            Action::RemoveRow(i) => {
+                if let Some(&id) = self.visible.get(i) {
+                    library.remove(&HashSet::from([id]));
+                    self.selected = None;
+                }
+            }
             Action::Settings => self.settings_open = !self.settings_open,
             Action::ToggleShortcuts => return Some(Request::SetShortcuts(!self.shortcuts)),
             Action::PreviousScene | Action::NextScene => {
@@ -437,7 +443,7 @@ impl MainWindow {
         }
     }
 
-    /// Keys. With shortcuts off (the default) only a few always work: ⌘/Ctrl+Q, and editing the prompt once it's
+    /// Keys. With shortcuts off (they're on by default) only a few always work: ⌘/Ctrl+Q, and editing the prompt once it's
     /// been clicked. With them on, typing anywhere searches and the player keys below apply.
     fn key(&mut self, event: &KeyEvent, library: &mut Library) -> Option<Request> {
         if event.state != ElementState::Pressed {
