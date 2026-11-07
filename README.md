@@ -2,6 +2,8 @@
 
 A lightweight retro music player for macOS. Plays MP3, WAV, AIFF and FLAC. Native Swift and has no dependencies.
 
+This is a personal project, built with [Claude Code](https://claude.com/claude-code).
+
 ## Build & run
 
 ```sh
