@@ -64,3 +64,13 @@ The shader draws the bodies' gravitational field as flowing rings, with feedback
 - **High = sparkle.** Near stars twinkle, shooting stars streak by, and strong hits put a faint glint on the glass.
 
 The camera sways and rolls slowly, and banks a little on sustained bass. A minimal HUD shows a bezel, a reticle, a heading tape and a throttle readout. Every 30–90 s a planet, moon or asteroid field drifts past on one side. All the colors live in `ViewscreenPalette`.
+
+**Spellrun** (`SpellrunScene`, with the game itself in `GrimoireCore/Spellrun/`) is a generated pixel platformer that the music plays. A little apprentice auto-runs through an endless world:
+- **Low:** kicks make the apprentice hop when the ground ahead is safe, big kicks mid-air turn into ground pounds that shake the screen and squish slimes, and beat lanterns and rune blocks glow with the bass.
+- **Mid:** sets run speed and how lively the generated terrain is. Calm music makes long meadows; busy music adds gaps, hills, floating platforms and rune blocks.
+- **High:** spell bolts that pop bats and shatter rune blocks, motes that the music drops into the air, twinkling stars and the staff gem's glow.
+
+The world cycles through four biomes (Sunlit Meadow, Dusk Forest, Crystal Cavern, Starlit Ramparts) with a pixel-dither dissolve between them. Every gap and step the generator makes can be cleared at minimum speed, and a once-per-jump *staff boost* (a magic double jump) rescues the apprentice from bad bounces. The tests check that the apprentice never falls. The frame is drawn on the CPU at about 256×160, and Metal scales it up by a whole number so every pixel stays sharp. All the art is original and drawn in code.
+
+To try it on real music: `SPELLRUN_TRACK=/path/to/song.aiff SPELLRUN_FRAMES=/some/folder swift test --filter SpellrunMusicTests`. It runs the track through the app's band analysis, reports what the music triggered, and saves a frame every 10 s.
+

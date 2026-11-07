@@ -21,11 +21,13 @@ protocol WindowScene: AnyObject {
 enum WindowSceneKind: String, CaseIterable {
     case threeBody
     case viewscreen
+    case spellrun
 
     var title: String {
         switch self {
         case .threeBody: "Three-Body"
         case .viewscreen: "Viewscreen"
+        case .spellrun: "Spellrun"
         }
     }
 
@@ -34,6 +36,7 @@ enum WindowSceneKind: String, CaseIterable {
         switch self {
         case .threeBody: "New Orbit"
         case .viewscreen: "New Course"
+        case .spellrun: "New World"
         }
     }
 
@@ -42,6 +45,7 @@ enum WindowSceneKind: String, CaseIterable {
         switch self {
         case .threeBody: try ThreeBodyScene(device: device, colorPixelFormat: colorPixelFormat)
         case .viewscreen: try ViewscreenScene(device: device, colorPixelFormat: colorPixelFormat)
+        case .spellrun: try SpellrunScene(device: device, colorPixelFormat: colorPixelFormat)
         }
     }
 }
