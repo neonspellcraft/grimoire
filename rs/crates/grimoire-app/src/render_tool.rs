@@ -10,6 +10,7 @@ use grimoire_core::{BandFollower, MultibandAnalyzer};
 
 use crate::gpu::Gpu;
 use crate::scenes::{SceneAudio, SceneKind};
+use crate::ui::{layout, Effects, Screen, UiRenderer};
 
 pub struct RenderRequest {
     pub kind: SceneKind,
@@ -171,6 +172,89 @@ pub fn render(
         frame += 1;
     }
     Ok(frame)
+}
+
+/// `--render-ui out.png [--size 520x420] [--scale 2] [--reveal 1]`:
+/// draws the main window with sample data, for reviewing the look without a running player.
+pub fn render_ui_from_args(args: &[String]) -> Option<Result<(), String>> {
+    let flag = args.iter().position(|a| a == "--render-ui")?;
+    let value = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
+    Some((|| {
+        let out = args.get(flag + 1).ok_or("--render-ui needs an output path")?;
+        let size: Vec<u32> = value("--size").unwrap_or("520x420".into()).split('x').filter_map(|s| s.parse().ok()).collect();
+        let scale: f32 = value("--scale").and_then(|s| s.parse().ok()).unwrap_or(2.0);
+        let mut view = layout::sample_view();
+        if let Some(reveal) = value("--reveal").and_then(|s| s.parse().ok()) {
+            view.reveal = reveal;
+        }
+        let width = (size.first().copied().unwrap_or(520) as f32 * scale) as u32;
+        let height = (size.get(1).copied().unwrap_or(420) as f32 * scale) as u32;
+        let rgba = render_ui(&view, scale, width, height)?;
+        image::save_buffer(out, &rgba, width, height, image::ColorType::Rgba8).map_err(|e| e.to_string())?;
+        println!("Saved {width}x{height} UI to {out}");
+        Ok(())
+    })())
+}
+
+pub fn render_ui(view: &layout::View, scale: f32, width: u32, height: u32) -> Result<Vec<u8>, String> {
+    let gpu = Gpu::new(&Gpu::instance(), None)?;
+    let format = wgpu::TextureFormat::Bgra8Unorm;
+    let mut ui = UiRenderer::new(&gpu.device, format, scale);
+    let (cols, rows) = ui.grid_size(width, height);
+    let mut screen = Screen::new(cols, rows);
+    layout::layout(view, &mut screen);
+    let target = gpu.device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("ui target"),
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let mut encoder = gpu.device.create_command_encoder(&Default::default());
+    let effects = Effects { time: view.clock as f32, glow: view.beat };
+    ui.render(&gpu.device, &gpu.queue, &mut encoder, &target.create_view(&Default::default()), (width, height), &screen, effects);
+    gpu.queue.submit([encoder.finish()]);
+    capture(&gpu, &target)
+}
+
+/// Reads a BGRA texture back as RGBA bytes.
+fn capture(gpu: &Gpu, target: &wgpu::Texture) -> Result<Vec<u8>, String> {
+    let (width, height) = (target.width(), target.height());
+    let row_bytes = width * 4;
+    let padded_row = row_bytes.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+    let readback = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("readback"),
+        size: (padded_row * height) as u64,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut encoder = gpu.device.create_command_encoder(&Default::default());
+    encoder.copy_texture_to_buffer(
+        target.as_image_copy(),
+        wgpu::TexelCopyBufferInfo {
+            buffer: &readback,
+            layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded_row), rows_per_image: Some(height) },
+        },
+        target.size(),
+    );
+    gpu.queue.submit([encoder.finish()]);
+    let slice = readback.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    gpu.device.poll(wgpu::PollType::Wait).map_err(|e| e.to_string())?;
+    let mut rgba = vec![0u8; (row_bytes * height) as usize];
+    {
+        let data = slice.get_mapped_range();
+        for (row, out) in data.chunks(padded_row as usize).zip(rgba.chunks_mut(row_bytes as usize)) {
+            for (bgra, px) in row[..row_bytes as usize].chunks_exact(4).zip(out.chunks_exact_mut(4)) {
+                px.copy_from_slice(&[bgra[2], bgra[1], bgra[0], 255]);
+            }
+        }
+    }
+    readback.unmap();
+    Ok(rgba)
 }
 
 #[cfg(test)]

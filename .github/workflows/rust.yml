@@ -31,6 +31,16 @@ jobs:
       - name: Build release
         run: cargo build --release
 
+      # A screenshot of the main window drawn on this OS (WARP on Windows), to check it looks the same.
+      - name: Render UI sample
+        run: cargo run --release -- --render-ui ui-${{ runner.os }}.png
+
+      - name: Upload UI sample
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-sample-${{ runner.os }}
+          path: rs/ui-${{ runner.os }}.png
+
       - name: Upload Windows build
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4

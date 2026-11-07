@@ -9,19 +9,31 @@ reaches feature parity.
 | `grimoire-audio` | symphonia decoding, rubato resampling, cpal output (CoreAudio / WASAPI), visualizer tap | `Sources/Grimoire/Audio` |
 | `grimoire-app` | winit window, wgpu scenes (Metal / Direct3D 12), the `--render-scene` tool | `Sources/Grimoire/UI/SceneWindow` |
 
-## Status: milestone 1
-- Done: core logic with all the Swift tests ported; playback of MP3, WAV, AIFF and FLAC with sample-accurate seeking,
-  gapless trimming, high-quality resampling and following output-device changes; the Three-Body scene in WGSL.
-- Not yet: the main window (transport, playlist, spectrum, scope), the other three scenes (Viewscreen, Spellrun,
-  Splatter), media keys and Now Playing, saved settings, packaging.
+## Status
+- Milestone 1: core logic with all the Swift tests ported; playback of MP3, WAV, AIFF and FLAC with sample-accurate
+  seeking, gapless trimming, high-quality resampling and following output-device changes; the Three-Body scene in WGSL.
+- Milestone 2: the "terminal grimoire" main window. It's a character grid with a CRT finish (phosphor bloom,
+  scanlines, a beat-reactive glow) and holds the prompt (type to search, Enter plays), seek bar, spectrum,
+  transport, volume, shuffle and repeat, and the playlist. Track changes play a rune glitch reveal. The visualizer
+  is a second window you can toggle. Settings persist, and the first launch imports the Swift app's last playlist.
+- Not yet: Viewscreen, Spellrun and Splatter scenes; media keys and Now Playing; playlist reordering; packaging.
 
 ## Use
 ```sh
-cargo run --release -- ~/Music/album/            # files, folders or .m3u playlists
+cargo run --release -- ~/Music/album/            # files, folders or .m3u playlists (or drop them on the window)
+cargo run --release -- --render-ui ui.png        # the main window with sample data, as a PNG
 cargo run --release -- --render-scene threeBody --track song.wav --out frames/ --seconds 20 --every 5
 ```
-Keys: Space play/pause, ←/→ seek (Shift for 30 s), N/P next/previous, ↑/↓ volume, R new orbit, M band meters,
-F or double-click for full screen, Q quit. Drop files on the window to add them.
+Main window: type to search, Enter plays the match. Space play/pause, ←/→ seek (Shift for 30 s), ↑/↓ select,
+Delete removes, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open, ⌘/Ctrl+V visualizer, ⌘/Ctrl+Q quit. Click or drag the seek
+bar and volume; scroll the list or the volume.
+Visualizer: R new orbit, M band meters, F or double-click for full screen.
+
+Settings live in `~/Library/Application Support/Grimoire/settings.json` (macOS) or `%APPDATA%\Grimoire` (Windows).
+Set `GRIMOIRE_SETTINGS` to use a different file.
+
+Fonts: JetBrains Mono, with Noto Sans Runic, Symbols, Symbols 2 and Math as fallbacks, all under the SIL Open Font
+License (see `crates/grimoire-app/assets/fonts`).
 
 ## Test
 ```sh
