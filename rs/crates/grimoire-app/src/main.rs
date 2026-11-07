@@ -8,6 +8,7 @@
 
 mod app;
 mod controller;
+mod doom_controls;
 mod feed;
 mod gpu;
 mod library;

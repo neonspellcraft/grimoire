@@ -1,6 +1,7 @@
 //! Full-window GPU visualizer scenes (port of `Sources/Grimoire/UI/SceneWindow`).
 
 mod animation;
+mod clouds;
 mod doom;
 mod splatter;
 mod spellrun;
@@ -10,6 +11,7 @@ mod viewscreen;
 use grimoire_core::BandLevels;
 
 pub use animation::AnimationScene;
+pub use clouds::CloudsScene;
 pub use doom::DoomScene;
 pub use spellrun::SpellrunScene;
 pub use splatter::SplatterScene;
@@ -52,6 +54,8 @@ pub trait WindowScene {
     fn set_visible(&mut self, _visible: bool) {}
     /// The scene's own sound effects (Grimoire's setting; off by default).
     fn set_sound(&mut self, _on: bool) {}
+    /// Doom's keyboard controls (Grimoire's settings).
+    fn set_doom_controls(&mut self, _controls: &crate::doom_controls::DoomControls) {}
     /// True once the scene wants to hand the window back (Quit in Doom's menu).
     fn wants_to_leave(&mut self) -> bool {
         false
@@ -66,18 +70,21 @@ pub enum SceneKind {
     Splatter,
     /// The user's looping wizard animation (doesn't follow the music).
     Wizard,
+    /// A dim night sky with clouds drifting past the moon; gently music-driven.
+    Clouds,
     /// A game rather than a visualizer: Freedoom on the Doom engine, played with the keyboard or a controller.
     Doom,
 }
 
 impl SceneKind {
     /// In menu order. Doom always stays last.
-    pub const ALL: [SceneKind; 6] = [
+    pub const ALL: [SceneKind; 7] = [
         SceneKind::ThreeBody,
         SceneKind::Viewscreen,
         SceneKind::Spellrun,
         SceneKind::Splatter,
         SceneKind::Wizard,
+        SceneKind::Clouds,
         SceneKind::Doom,
     ];
 
@@ -94,6 +101,7 @@ impl SceneKind {
             SceneKind::Spellrun => "spellrun",
             SceneKind::Splatter => "splatter",
             SceneKind::Wizard => "wizard",
+            SceneKind::Clouds => "clouds",
             SceneKind::Doom => "doom",
         }
     }
@@ -109,6 +117,7 @@ impl SceneKind {
             SceneKind::Spellrun => "Spellrun",
             SceneKind::Splatter => "Splatter",
             SceneKind::Wizard => "Wizard",
+            SceneKind::Clouds => "Night Clouds",
             SceneKind::Doom => "Doom",
         }
     }
@@ -121,6 +130,7 @@ impl SceneKind {
             SceneKind::Spellrun => "New World",
             SceneKind::Splatter => "Fresh Canvas",
             SceneKind::Wizard => "From the Top",
+            SceneKind::Clouds => "New Sky",
             SceneKind::Doom => "",
         }
     }
@@ -132,6 +142,7 @@ impl SceneKind {
             SceneKind::Splatter => Ok(Box::new(SplatterScene::new(device, format))),
             SceneKind::Spellrun => Ok(Box::new(SpellrunScene::new(device, format))),
             SceneKind::Wizard => Ok(Box::new(AnimationScene::new(device, format, &animation::wizard_file()?)?)),
+            SceneKind::Clouds => Ok(Box::new(CloudsScene::new(device, format))),
             SceneKind::Doom => Ok(Box::new(DoomScene::new(device, format)?)),
         }
     }

@@ -14,15 +14,17 @@ use winit::window::{CursorIcon, ResizeDirection, Window};
 
 use crate::feed::AudioFeed;
 use crate::gpu::{Gpu, WindowSurface};
+use crate::doom_controls::{display, key_name, DoomAction, DoomControls};
 use crate::library::{format_line, matches, Library};
 use crate::menus::{popup, reveal, Entry};
 use crate::scenes::SceneKind;
 use crate::ui::layout::{self, list_rows, MIN_COLS, MIN_ROWS};
 use crate::ui::screen::CellRect;
+use crate::ui::layout::DoomControlsView;
 use crate::ui::{Action, Effects, RowView, Screen, Selection, SettingsView, UiRenderer, View};
 
 /// What the main window asks of the app.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Request {
     Quit,
     ToggleVisualizer,
@@ -31,6 +33,7 @@ pub enum Request {
     SetMeters(bool),
     Reseed,
     SetDoomSound(bool),
+    SetDoomControls(DoomControls),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -75,6 +78,10 @@ pub struct MainWindow {
     pub scene: SceneKind,
     pub show_meters: bool,
     pub doom_sound: bool,
+    pub doom_controls: DoomControls,
+    doom_controls_open: bool,
+    /// The Doom controls slot (action, slot) waiting for a key press.
+    capturing: Option<(DoomAction, usize)>,
 }
 
 impl MainWindow {
@@ -108,6 +115,9 @@ impl MainWindow {
             scene: SceneKind::ThreeBody,
             show_meters: false,
             doom_sound: false,
+            doom_controls: DoomControls::default(),
+            doom_controls_open: false,
+            capturing: None,
         };
         window.apply_min_size();
         window
@@ -244,6 +254,19 @@ impl MainWindow {
                 meters: self.show_meters,
                 visualizer_open: self.visualizer_open,
                 doom_sound: self.doom_sound,
+                doom_controls: self.doom_controls_open.then(|| DoomControlsView {
+                    rows: DoomAction::ALL
+                        .iter()
+                        .map(|&action| {
+                            let slots = self.doom_controls.slots(action);
+                            let show = |k: &Option<String>| k.as_deref().map(display).unwrap_or_default();
+                            (action.label().to_string(), [show(&slots[0]), show(&slots[1])])
+                        })
+                        .collect(),
+                    capturing: self
+                        .capturing
+                        .and_then(|(action, slot)| DoomAction::ALL.iter().position(|&a| a == action).map(|i| (i, slot))),
+                }),
             }),
         }
     }
@@ -400,7 +423,23 @@ impl MainWindow {
                     self.selection.clear();
                 }
             }
-            Action::Settings => self.settings_open = !self.settings_open,
+            Action::Settings => {
+                self.settings_open = !self.settings_open;
+                self.doom_controls_open = false;
+                self.capturing = None;
+            }
+            Action::OpenDoomControls => self.doom_controls_open = true,
+            Action::CloseDoomControls => {
+                self.doom_controls_open = false;
+                self.capturing = None;
+            }
+            Action::BindDoomKey(row, slot) => {
+                self.capturing = DoomAction::ALL.get(row).map(|&action| (action, slot));
+            }
+            Action::ResetDoomControls => {
+                self.capturing = None;
+                return Some(Request::SetDoomControls(DoomControls::default()));
+            }
             Action::ToggleShortcuts => return Some(Request::SetShortcuts(!self.shortcuts)),
             Action::PreviousScene | Action::NextScene => {
                 let all = SceneKind::ALL;
@@ -557,6 +596,21 @@ impl MainWindow {
     fn key(&mut self, event: &KeyEvent, library: &mut Library) -> Option<Request> {
         if event.state != ElementState::Pressed {
             return None;
+        }
+        // Assigning a Doom key: the next key press is the key (Esc cancels, Delete or Backspace clears the slot).
+        if let Some((action, slot)) = self.capturing {
+            self.capturing = None;
+            let key = match &event.logical_key {
+                Key::Named(NamedKey::Escape) => return None,
+                Key::Named(NamedKey::Delete | NamedKey::Backspace) => None,
+                other => match key_name(other) {
+                    Some(name) => Some(name),
+                    None => return None,
+                },
+            };
+            let mut controls = self.doom_controls.clone();
+            controls.bind(action, slot, key);
+            return Some(Request::SetDoomControls(controls));
         }
         let command = if cfg!(target_os = "macos") { self.modifiers.super_key() } else { self.modifiers.control_key() };
         if command {

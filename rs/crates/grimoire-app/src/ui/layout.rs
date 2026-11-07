@@ -50,6 +50,11 @@ pub enum Action {
     ToggleMeters,
     Reseed,
     ToggleDoomSound,
+    OpenDoomControls,
+    CloseDoomControls,
+    /// A key slot on the Doom controls page: (row, slot 0 or 1).
+    BindDoomKey(usize, usize),
+    ResetDoomControls,
 }
 
 /// What the settings panel shows.
@@ -60,6 +65,16 @@ pub struct SettingsView {
     pub meters: bool,
     pub visualizer_open: bool,
     pub doom_sound: bool,
+    /// Some while the Doom controls page is showing.
+    pub doom_controls: Option<DoomControlsView>,
+}
+
+/// One line per Doom action: its label and the two keys bound to it (already formatted, "" for empty).
+#[derive(Clone, Debug, Default)]
+pub struct DoomControlsView {
+    pub rows: Vec<(String, [String; 2])>,
+    /// The slot waiting for a key press.
+    pub capturing: Option<(usize, usize)>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -240,8 +255,13 @@ pub fn layout(view: &View, screen: &mut Screen<Action>) {
     let first = 7;
     let visible = list_rows(h);
     if let Some(settings) = &view.settings {
-        screen.text(2, 6, " settings ", VIOLET, 10);
-        draw_settings(settings, screen, first, visible as u16);
+        if let Some(controls) = &settings.doom_controls {
+            screen.text(2, 6, " doom controls ", VIOLET, 15);
+            draw_doom_controls(controls, view.clock, screen, first, visible as u16);
+        } else {
+            screen.text(2, 6, " settings ", VIOLET, 10);
+            draw_settings(settings, screen, first, visible as u16);
+        }
         return;
     }
     screen.hit(CellRect { x: 1, y: first, w: inner, h: visible as u16 }, Action::List);
@@ -298,13 +318,14 @@ fn draw_settings(settings: &SettingsView, screen: &mut Screen<Action>, first: u1
     let reseed = if settings.visualizer_open { "cast" } else { "open ◈ first" };
     line(screen, "reseed the scene", reseed, settings.visualizer_open, Action::Reseed);
     line(screen, "doom sound", if settings.doom_sound { "on" } else { "off" }, settings.doom_sound, Action::ToggleDoomSound);
+    line(screen, "doom controls", "edit", true, Action::OpenDoomControls);
 
     let help: &[&str] = if settings.shortcuts {
         &[
             "space play/pause · ←/→ seek (shift 30 s) · ↑/↓ select",
             "enter play · delete or × removes the selection · type to search",
             "⌘/ctrl ←/→ prev/next · o open · v visualizer",
-            "visualizer: 1–6 or tab scenes · r reseed · m meters · f full",
+            "visualizer: 1–7 or tab scenes · r reseed · m meters · f full",
             "doom: right-click the visualizer to leave it",
         ]
     } else {
@@ -315,6 +336,54 @@ fn draw_settings(settings: &SettingsView, screen: &mut Screen<Action>, first: u1
         if y < first + rows {
             screen.text_ellipsized(4, y, text, GREEN_FAINT, inner.saturating_sub(4));
         }
+    }
+}
+
+fn draw_doom_controls(view: &DoomControlsView, clock: f64, screen: &mut Screen<Action>, first: u16, rows: u16) {
+    let inner = screen.cols - 2;
+    let slot_width = 12u16;
+    let first_slot = 22.min(inner.saturating_sub(2 * slot_width));
+    let end = first + rows;
+    let mut row = first;
+    for (i, (label, keys)) in view.rows.iter().enumerate() {
+        if row >= end {
+            break;
+        }
+        screen.text(4, row, label, GREEN_DIM, first_slot.saturating_sub(5));
+        for (slot, key) in keys.iter().enumerate() {
+            let x = first_slot + slot as u16 * slot_width;
+            let capturing = view.capturing == Some((i, slot));
+            let (text, color) = if capturing {
+                // Blinks while waiting for a key.
+                (if (clock * 2.0).fract() < 0.6 { "press a key" } else { "" }.to_string(), GREEN)
+            } else if key.is_empty() {
+                ("·".to_string(), GREEN_FAINT)
+            } else {
+                (key.clone(), GREEN)
+            };
+            screen.text(x, row, "‹", VIOLET_DIM, 1);
+            screen.text_ellipsized(x + 2, row, &text, color, slot_width - 5);
+            screen.text(x + slot_width - 3, row, "›", VIOLET_DIM, 1);
+            screen.hit(CellRect { x, y: row, w: slot_width - 1, h: 1 }, Action::BindDoomKey(i, slot));
+        }
+        row += 1;
+    }
+    if row + 1 < end {
+        row += 1;
+        let n = screen.text(4, row, "‹ reset to defaults ›", VIOLET_DIM, inner.saturating_sub(4));
+        screen.hit(CellRect { x: 3, y: row, w: n + 2, h: 1 }, Action::ResetDoomControls);
+        let back_x = 4 + n + 3;
+        let m = screen.text(back_x, row, "‹ back ›", VIOLET, inner.saturating_sub(back_x));
+        screen.hit(CellRect { x: back_x - 1, y: row, w: m + 2, h: 1 }, Action::CloseDoomControls);
+        row += 1;
+    }
+    if row < end {
+        let help = if view.capturing.is_some() {
+            "press the key to use · delete clears the slot · esc cancels"
+        } else {
+            "click a slot, then press a key · menus always use arrows, enter and esc"
+        };
+        screen.text_ellipsized(4, row, help, GREEN_FAINT, inner.saturating_sub(4));
     }
 }
 
@@ -519,6 +588,7 @@ mod tests {
             meters: true,
             visualizer_open: true,
             doom_sound: false,
+            doom_controls: None,
         });
         let screen = render(&view, 48, 16);
         assert!(screen.row_text(6).contains(" settings "));

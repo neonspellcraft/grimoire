@@ -1,5 +1,5 @@
 //! The visualizer window (port of `SceneHostView`): one full-window scene driven by the shared audio feed.
-//! Drag to move, double-click for full screen; 1–6 or Tab switch scenes, R reseed, M band meters, F full screen,
+//! Drag to move, double-click for full screen; 1–7 or Tab switch scenes, R reseed, M band meters, F full screen,
 //! Space play/pause. While Doom is showing, every key goes to the game instead.
 
 use std::time::{Duration, Instant};
@@ -31,6 +31,7 @@ pub struct VisWindow {
     previous: SceneKind,
     /// Doom's sound effects (Grimoire's setting; off by default).
     game_sound: bool,
+    doom_controls: crate::doom_controls::DoomControls,
 }
 
 /// Whether the visualizer window wants to close.
@@ -43,6 +44,7 @@ impl VisWindow {
         kind: SceneKind,
         show_meters: bool,
         game_sound: bool,
+        doom_controls: crate::doom_controls::DoomControls,
     ) -> Result<VisWindow, String> {
         // Fall back to Three-Body if the saved scene can't be built (e.g. one from a newer build).
         let (kind, mut scene) = match kind.make(&gpu.device, surface.view_format) {
@@ -53,6 +55,7 @@ impl VisWindow {
             }
         };
         scene.set_sound(game_sound);
+        scene.set_doom_controls(&doom_controls);
         surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
         Ok(VisWindow {
             surface,
@@ -67,12 +70,18 @@ impl VisWindow {
             focused: true,
             previous: SceneKind::ThreeBody,
             game_sound,
+            doom_controls,
         })
     }
 
     /// Games pause unless the window is showing and focused (so keys typed elsewhere don't play them).
     fn update_visibility(&mut self) {
         self.scene.set_visible(self.focused && !self.occluded);
+    }
+
+    pub fn set_doom_controls(&mut self, controls: &crate::doom_controls::DoomControls) {
+        self.doom_controls = controls.clone();
+        self.scene.set_doom_controls(controls);
     }
 
     pub fn set_game_sound(&mut self, on: bool) {
@@ -98,6 +107,7 @@ impl VisWindow {
                 self.kind = kind;
                 self.last_frame = None;
                 self.scene.set_sound(self.game_sound);
+                self.scene.set_doom_controls(&self.doom_controls);
                 self.update_visibility();
                 self.surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
             }
@@ -185,7 +195,7 @@ impl VisWindow {
                 "f" => self.toggle_fullscreen(),
                 "m" => self.show_meters = !self.show_meters,
                 "r" => self.scene.reseed(),
-                digit @ ("1" | "2" | "3" | "4" | "5" | "6") => {
+                digit @ ("1" | "2" | "3" | "4" | "5" | "6" | "7") => {
                     let index = digit.parse::<usize>().unwrap() - 1;
                     self.select(gpu, SceneKind::ALL[index]);
                 }

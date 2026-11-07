@@ -29,6 +29,8 @@ pub struct Settings {
     pub keyboard_shortcuts: bool,
     /// Doom's sound effects. Off by default: Grimoire is usually playing music.
     pub doom_sound: bool,
+    /// Doom's keyboard controls (⚙ → doom controls).
+    pub doom_controls: crate::doom_controls::DoomControls,
 }
 
 impl Default for Settings {
@@ -50,6 +52,7 @@ impl Default for Settings {
             show_meters: false,
             keyboard_shortcuts: true,
             doom_sound: false,
+            doom_controls: crate::doom_controls::DoomControls::default(),
         }
     }
 }

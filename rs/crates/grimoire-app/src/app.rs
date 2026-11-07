@@ -26,7 +26,7 @@ Click the prompt to search the playlist; Enter plays the match. ⌘/Ctrl+Q quits
 or .m3u playlists on either window. Keyboard shortcuts (on by default; turn them off in settings ⚙):
 Space play/pause, ←/→ seek (Shift: 30 s), ↑/↓ select, Delete removes, type anywhere to search,
 ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open, ⌘/Ctrl+V visualizer;
-visualizer window: 1–6 or Tab switch scenes, R reseed, M band meters, F full screen.";
+visualizer window: 1–7 or Tab switch scenes, R reseed, M band meters, F full screen.";
 
 pub fn run(paths: Vec<PathBuf>) -> Result<(), String> {
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
@@ -111,6 +111,14 @@ impl ApplicationHandler for App {
                     if let Some(vis) = &mut app.vis {
                         vis.show_meters = on;
                     }
+                    app.library.dirty = true;
+                }
+                Some(Request::SetDoomControls(controls)) => {
+                    if let Some(vis) = &mut app.vis {
+                        vis.set_doom_controls(&controls);
+                    }
+                    app.main.doom_controls = controls.clone();
+                    app.settings.doom_controls = controls;
                     app.library.dirty = true;
                 }
                 Some(Request::SetDoomSound(on)) => {
@@ -200,6 +208,7 @@ impl Running {
         main.show_remaining = settings.show_remaining;
         main.shortcuts = settings.keyboard_shortcuts;
         main.doom_sound = settings.doom_sound;
+        main.doom_controls = settings.doom_controls.clone();
 
         let mut library = Library::new();
         if paths.is_empty() {
@@ -267,7 +276,14 @@ impl Running {
             .and_then(|window| WindowSurface::new(&self.instance, Some(&self.gpu), Arc::new(window)))
             .and_then(|(surface, _)| {
                 let kind = SceneKind::from_raw(&self.settings.scene).unwrap_or(SceneKind::ThreeBody);
-                VisWindow::new(surface, &self.gpu, kind, self.settings.show_meters, self.settings.doom_sound)
+                VisWindow::new(
+                    surface,
+                    &self.gpu,
+                    kind,
+                    self.settings.show_meters,
+                    self.settings.doom_sound,
+                    self.settings.doom_controls.clone(),
+                )
             });
         match opened {
             Ok(mut vis) => {

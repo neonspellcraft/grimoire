@@ -137,6 +137,12 @@ impl Doom {
         self.0.quit_requested.swap(false, Ordering::SeqCst)
     }
 
+    /// Doom's menu is open (menus always answer to arrows, Enter and Esc).
+    pub fn menu_open(&self) -> bool {
+        // SAFETY: reads one int the engine thread writes; a stale answer only lasts a frame.
+        unsafe { grimoire_doom_menu_active() != 0 }
+    }
+
     /// The engine hit a fatal error and won't run again this session.
     pub fn has_stopped(&self) -> bool {
         self.0.stopped.load(Ordering::SeqCst)
@@ -166,6 +172,7 @@ pub fn bundled_freedoom() -> Option<std::path::PathBuf> {
 
 extern "C" {
     fn grimoire_doom_run(argc: c_int, argv: *mut *mut c_char) -> c_int;
+    fn grimoire_doom_menu_active() -> c_int;
     static DG_ScreenBuffer: *mut u32;
 }
 

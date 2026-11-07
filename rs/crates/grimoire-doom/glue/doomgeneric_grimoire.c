@@ -50,6 +50,14 @@ int grimoire_doom_run(int argc, char **argv)
     }
 }
 
+// Whether Doom's menu is open, so Grimoire can keep menu keys working whatever the game controls are bound to.
+extern boolean menuactive;
+
+int grimoire_doom_menu_active(void)
+{
+    return menuactive ? 1 : 0;
+}
+
 // Settings the SDL sound module would normally define.
 int use_libsamplerate = 0;
 float libsamplerate_scale = 0.65f;

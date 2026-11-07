@@ -27,6 +27,8 @@ The app icon is drawn by `scripts/make-icon.swift` (writes `packaging/icons/` an
 
 - Wizard: a visualizer that plays the looping wizard animation (it doesn't follow the music). The video is turned
   into a frame animation by `scripts/make-animation.sh` (crops black bars, keeps the frame rate).
+- Night Clouds: a dim night sky with clouds drifting past the moon. Gently music-driven: the bass slowly swells
+  the cloud cover, the mids quicken the drift and light the cloud edges, the highs twinkle the stars.
 - Doom: always the last visualizer, and a game. It plays Freedoom (free game data for the Doom engine, bundled with the
   app) with the keyboard or a USB/Bluetooth controller. Its sound is off by default (⚙ → doom sound), its music isn't
   implemented, and choosing Quit in its menu returns to the previous visualizer.
@@ -46,13 +48,15 @@ menu, and in the visualizer for scenes, reseed, band meters and full screen. ⚙
 
 Keyboard shortcuts are on by default and can be turned off in settings: Space play/pause, ←/→ seek (Shift for 30 s),
 ↑/↓ select, Enter play, Delete removes, type anywhere to search, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open,
-⌘/Ctrl+V visualizer; in the visualizer window 1–6 or Tab switch scenes, R reseed, M band meters, F full screen.
+⌘/Ctrl+V visualizer; in the visualizer window 1–7 or Tab switch scenes, R reseed, M band meters, F full screen.
 Double-click the visualizer for full screen and Esc to leave it either way.
 
 Doom: classic keys (arrows, Ctrl fire, Space use, Shift run, Alt or `,`/`.` strafe, Esc menu, Tab map, 1–7 weapons)
 plus WASD. Controllers: left stick moves, right stick or d-pad turns, A or the right trigger fires (A selects in menus),
 B or X uses (B backs out of menus), Y switches weapon, bumpers strafe, the left trigger runs, Start is the menu and
 Select the map. While Doom is showing every key goes to the game; right-click the visualizer to switch scenes.
+The keyboard controls can be reassigned in ⚙ → doom controls (two keys per action; menus always use arrows, Enter
+and Esc).
 
 The main window redraws at 60 fps only while something moves and the visualizer only while it's visible, so a
 paused Grimoire uses about 1% CPU.

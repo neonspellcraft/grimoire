@@ -2,7 +2,7 @@
 //! the keyboard and game controllers play it. Choosing Quit in Doom's menu hands the window back to the
 //! previous scene, and the game waits, paused, until it's picked again.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use grimoire_doom::{keys, Doom, HEIGHT, WIDTH};
 use winit::event::{ElementState, KeyEvent};
@@ -10,6 +10,7 @@ use winit::keyboard::{Key, NamedKey};
 
 use super::{color_pass, fullscreen_pipeline, SceneAudio, WindowScene};
 use crate::controller::{PadButton, PadInput, PadStick};
+use crate::doom_controls::{key_name, DoomControls};
 
 pub struct DoomScene {
     doom: Doom,
@@ -20,6 +21,9 @@ pub struct DoomScene {
     pixels: Vec<u32>,
     serial: u64,
     pad: PadMapper,
+    controls: DoomControls,
+    /// What each held key sent on its press, so its release undoes exactly that (even if the menu opened since).
+    held: HashMap<String, Vec<u8>>,
 }
 
 impl DoomScene {
@@ -116,6 +120,8 @@ impl DoomScene {
             pixels: Vec::with_capacity(WIDTH * HEIGHT),
             serial: u64::MAX,
             pad: PadMapper::default(),
+            controls: DoomControls::default(),
+            held: HashMap::new(),
         })
     }
 }
@@ -162,11 +168,23 @@ impl WindowScene for DoomScene {
         if event.repeat {
             return true; // the engine tracks held keys itself
         }
-        let pressed = event.state == ElementState::Pressed;
-        for code in keyboard_keys(&event.logical_key) {
-            self.doom.key(pressed, code);
+        let Some(name) = key_name(&event.logical_key) else { return true };
+        if event.state == ElementState::Pressed {
+            let codes = keyboard_keys(&event.logical_key, self.doom.menu_open(), &self.controls);
+            for &code in &codes {
+                self.doom.key(true, code);
+            }
+            self.held.insert(name, codes);
+        } else if let Some(codes) = self.held.remove(&name) {
+            for code in codes {
+                self.doom.key(false, code);
+            }
         }
         true
+    }
+
+    fn set_doom_controls(&mut self, controls: &DoomControls) {
+        self.controls = controls.clone();
     }
 
     fn pad(&mut self, input: PadInput) {
@@ -176,6 +194,9 @@ impl WindowScene for DoomScene {
     }
 
     fn set_visible(&mut self, visible: bool) {
+        if !visible {
+            self.held.clear(); // the engine releases everything when it pauses
+        }
         self.doom.set_active(visible);
     }
 
@@ -192,22 +213,13 @@ fn bytemuck_bytes<T: bytemuck::Pod>(values: &[T]) -> &[u8] {
     bytemuck::cast_slice(values)
 }
 
-/// Keyboard → Doom keys. Classic Doom controls (arrows, Ctrl fire, Space use, Shift run, Alt strafe, `,`/`.`
-/// strafe) plus WASD; letters are also passed through as themselves for menus, y/n prompts and cheat codes.
-pub fn keyboard_keys(key: &Key) -> Vec<u8> {
+/// Keys that always go straight to Doom as themselves, in menus and in play: menus, prompts, weapon numbers,
+/// cheat codes, function keys.
+fn passthrough_keys(key: &Key) -> Vec<u8> {
     match key {
         Key::Named(named) => match named {
-            NamedKey::ArrowUp => vec![keys::UP],
-            NamedKey::ArrowDown => vec![keys::DOWN],
-            NamedKey::ArrowLeft => vec![keys::LEFT],
-            NamedKey::ArrowRight => vec![keys::RIGHT],
-            NamedKey::Control => vec![keys::FIRE],
-            NamedKey::Space => vec![keys::USE],
-            NamedKey::Shift => vec![keys::RUN],
-            NamedKey::Alt => vec![keys::STRAFE],
             NamedKey::Enter => vec![keys::ENTER],
             NamedKey::Escape => vec![keys::ESCAPE],
-            NamedKey::Tab => vec![keys::TAB],
             NamedKey::Backspace => vec![keys::BACKSPACE],
             NamedKey::Pause => vec![keys::PAUSE],
             NamedKey::F1 => vec![keys::function(1)],
@@ -224,22 +236,31 @@ pub fn keyboard_keys(key: &Key) -> Vec<u8> {
             NamedKey::F12 => vec![keys::function(12)],
             _ => vec![],
         },
-        Key::Character(text) => {
-            let Some(c) = text.chars().next() else { return vec![] };
-            let mut codes: Vec<u8> = keys::character(c).into_iter().collect();
-            codes.extend(match c.to_ascii_lowercase() {
-                'w' => Some(keys::UP),
-                's' => Some(keys::DOWN),
-                'a' => Some(keys::STRAFE_LEFT),
-                'd' => Some(keys::STRAFE_RIGHT),
-                ',' | '<' => Some(keys::STRAFE_LEFT),
-                '.' | '>' => Some(keys::STRAFE_RIGHT),
-                _ => None,
-            });
-            codes
-        }
+        Key::Character(text) => text.chars().next().and_then(keys::character).into_iter().collect(),
         _ => vec![],
     }
+}
+
+/// Keyboard → Doom keys. In Doom's menu: arrows, Enter, Esc and Backspace navigate, whatever the bindings. In
+/// play: the user's bindings (⚙ → doom controls), plus the passthrough keys.
+pub fn keyboard_keys(key: &Key, menu_open: bool, controls: &DoomControls) -> Vec<u8> {
+    let mut codes = passthrough_keys(key);
+    if menu_open {
+        if let Key::Named(named) = key {
+            codes.extend(match named {
+                NamedKey::ArrowUp => Some(keys::UP),
+                NamedKey::ArrowDown => Some(keys::DOWN),
+                NamedKey::ArrowLeft => Some(keys::LEFT),
+                NamedKey::ArrowRight => Some(keys::RIGHT),
+                _ => None,
+            });
+        }
+    } else if let Some(name) = key_name(key) {
+        codes.extend(controls.actions_for(&name).into_iter().map(|action| action.doom_key()));
+    }
+    codes.sort_unstable();
+    codes.dedup();
+    codes
 }
 
 /// Controller → Doom keys, twin-stick style: left stick moves and strafes, right stick (or the d-pad) turns.
@@ -336,9 +357,19 @@ mod tests {
     }
 
     #[test]
-    fn keyboard_has_classic_and_wasd_controls() {
-        assert_eq!(keyboard_keys(&Key::Named(NamedKey::Control)), vec![keys::FIRE]);
-        assert_eq!(keyboard_keys(&Key::Character("W".into())), vec![b'w', keys::UP]);
-        assert_eq!(keyboard_keys(&Key::Character("y".into())), vec![b'y']);
+    fn keyboard_follows_bindings_in_play_and_menu_keys_in_menus() {
+        let mut controls = DoomControls::default();
+        let w = Key::Character("W".into());
+        assert_eq!(keyboard_keys(&Key::Named(NamedKey::Control), false, &controls), vec![keys::FIRE]);
+        assert_eq!(keyboard_keys(&w, false, &controls), vec![b'w', keys::UP]);
+        assert_eq!(keyboard_keys(&Key::Character("y".into()), false, &controls), vec![b'y']);
+        // In the menu, arrows navigate and letters are just letters.
+        assert_eq!(keyboard_keys(&Key::Named(NamedKey::ArrowDown), true, &controls), vec![keys::DOWN]);
+        assert_eq!(keyboard_keys(&w, true, &controls), vec![b'w']);
+        // Rebinding: W fires instead of moving forward.
+        controls.bind(crate::doom_controls::DoomAction::Fire, 1, Some("w".into()));
+        let mut expected = vec![b'w', keys::FIRE];
+        expected.sort_unstable();
+        assert_eq!(keyboard_keys(&w, false, &controls), expected);
     }
 }

@@ -197,6 +197,20 @@ pub fn render_ui_from_args(args: &[String]) -> Option<Result<(), String>> {
                 meters: false,
                 visualizer_open: true,
                 doom_sound: false,
+                doom_controls: args.iter().any(|a| a == "--doom-controls").then(|| {
+                    let controls = crate::doom_controls::DoomControls::default();
+                    crate::ui::layout::DoomControlsView {
+                        rows: crate::doom_controls::DoomAction::ALL
+                            .iter()
+                            .map(|&action| {
+                                let slots = controls.slots(action);
+                                let show = |k: &Option<String>| k.as_deref().map(crate::doom_controls::display).unwrap_or_default();
+                                (action.label().to_string(), [show(&slots[0]), show(&slots[1])])
+                            })
+                            .collect(),
+                        capturing: Some((6, 1)),
+                    }
+                }),
             });
         }
         let width = (size.first().copied().unwrap_or(520) as f32 * scale) as u32;
