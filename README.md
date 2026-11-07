@@ -6,6 +6,15 @@ A lightweight retro music player for macOS. Plays MP3, WAV, AIFF and FLAC. Nativ
 
 This is a personal project, built with [Claude Code](https://claude.com/claude-code).
 
+## Download
+
+**[⬇ Download Grimoire 0.7.0](https://github.com/neonspellcraft/grimoire/releases/latest)** for Mac and Windows:
+
+- **Windows:** [Grimoire-0.7.0-windows-x64.zip](https://github.com/neonspellcraft/grimoire/releases/latest/download/Grimoire-0.7.0-windows-x64.zip). Extract it and run `grimoire.exe`. If Windows says "Windows protected your PC", click **More info → Run anyway**.
+- **Mac:** [Grimoire-0.7.0-mac.dmg](https://github.com/neonspellcraft/grimoire/releases/latest/download/Grimoire-0.7.0-mac.dmg) (Apple Silicon and Intel). Drag Grimoire to Applications. The first time, use **System Settings → Privacy & Security → Open Anyway**.
+
+Version 0.7.0 is the new cross-platform Grimoire (source on the [`rust-port`](https://github.com/neonspellcraft/grimoire/tree/rust-port/rs) branch). The rest of this page describes the original Swift app.
+
 ## Install
 
 Run `scripts/make-dmg.sh` to build `dist/Grimoire-<version>.dmg`. Open it and drag **Grimoire** onto **Applications**. The app is universal (Apple Silicon and Intel) and needs macOS 14 or later.
