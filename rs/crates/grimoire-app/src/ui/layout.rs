@@ -255,7 +255,8 @@ pub fn layout(view: &View, screen: &mut Screen<Action>) {
             screen.set(6, row, '✦', with_alpha(VIOLET, pulse));
         }
         let duration = track.duration.map(time_math::clock).unwrap_or_default();
-        let duration_start = screen.text_right(w - 3, row, &duration, VIOLET_DIM);
+        // Room for the × that selected rows show after the duration.
+        let duration_start = screen.text_right(w - 4, row, &duration, VIOLET_DIM);
         let title = if track.current { glitched(&track.title, view.reveal, view.clock, 3) } else { plain(&track.title) };
         draw_glitched(screen, 8, row, &title, color, duration_start.saturating_sub(10));
         screen.hit(CellRect { x: 1, y: row, w: inner, h: 1 }, Action::Row(i));
@@ -472,7 +473,7 @@ mod tests {
         assert!(screen.row_text(2).contains("02:41 / 05:12"));
         assert!(screen.row_text(3).contains("‹ the coven ›"));
         assert!(screen.row_text(7).contains("01  ✦ moonrise"));
-        assert!(screen.row_text(7).ends_with("5:12  │"));
+        assert!(screen.row_text(7).ends_with("5:12   │"));
         assert!(screen.row_text(15).starts_with("└─ 12 spells · 55:26 "));
     }
 

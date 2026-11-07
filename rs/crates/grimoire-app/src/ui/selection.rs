@@ -27,6 +27,12 @@ impl Selection {
         self.tracks = HashSet::from([id]);
     }
 
+    /// Everything in `order` (the list as shown), anchored at the top.
+    pub fn select_all(&mut self, order: &[TrackId]) {
+        self.anchor = order.first().copied();
+        self.tracks = order.iter().copied().collect();
+    }
+
     pub fn clear(&mut self) {
         self.anchor = None;
         self.tracks.clear();
@@ -80,6 +86,9 @@ mod tests {
         assert_eq!(s.tracks, order[1..=3].iter().copied().collect());
         s.range_to(order[0], &order); // and back up past it: 0...1
         assert_eq!(s.tracks, order[0..=1].iter().copied().collect());
+        s.select_all(&order);
+        assert_eq!(s.tracks.len(), 6);
+        assert_eq!(s.anchor, Some(order[0]));
         s.clear();
         assert!(s.is_empty() && s.anchor.is_none());
         s.range_to(order[2], &order); // shift-click with nothing selected selects just that one

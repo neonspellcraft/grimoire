@@ -12,6 +12,7 @@ mod gpu;
 mod library;
 mod main_window;
 mod media;
+mod menus;
 mod render_tool;
 mod scenes;
 mod settings;

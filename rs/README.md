@@ -19,7 +19,10 @@ reaches feature parity.
 - Milestone 3: all four visualizer scenes (Three-Body, Viewscreen, Spellrun, Splatter), switched with 1–4 or Tab in
   the visualizer window; media keys and Now Playing (macOS Control Center, the Windows media overlay); dragging
   playlist rows to reorder; packaging as a universal macOS DMG and a Windows zip with an embedded icon.
-- Not yet: Finder's "Open With" on macOS (winit doesn't deliver those events), a right-click scene menu, code signing.
+- Not yet: Finder's "Open With" on macOS (winit doesn't deliver those events), code signing.
+
+The app icon is drawn by `scripts/make-icon.swift` (writes `packaging/icons/` and `assets/icon.png`); the Windows
+`.ico` is made from `packaging/icons/windows-1024.png`.
 
 ## Use
 ```sh
@@ -29,7 +32,9 @@ cargo run --release -- --render-scene threeBody --track song.wav --out frames/ -
 ```
 Main window: click the prompt to search the playlist, Enter plays the match. Click or drag the seek line and the
 volume, scroll the list or the volume, drag rows to reorder, double-click a row to play it. ⌘-click (Ctrl-click on Windows)
-adds a row to the selection and Shift-click selects a range; the × on a selected row, or Delete, removes the selection. ⚙ opens settings
+adds a row to the selection and Shift-click selects a range; the × on a selected row, or Delete, removes the selection.
+Right-click a track for Play, Remove, Show in Finder, Select All and Clear Playlist; right-click elsewhere for the app
+menu, and in the visualizer for scenes, reseed, band meters and full screen. ⚙ opens settings
 (keyboard shortcuts, visualizer scene, band meters, reseed). ⌘/Ctrl+Q quits.
 
 Keyboard shortcuts are on by default and can be turned off in settings: Space play/pause, ←/→ seek (Shift for 30 s),

@@ -24,7 +24,7 @@ APP="dist/Grimoire.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 lipo -create "${BINARIES[@]}" -output "$APP/Contents/MacOS/Grimoire"
-cp ../Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp packaging/icons/Grimoire.icns "$APP/Contents/Resources/AppIcon.icns"
 mkdir -p "$APP/Contents/Resources/licenses"
 cp crates/grimoire-app/assets/fonts/*-OFL.txt "$APP/Contents/Resources/licenses/"
 # No CFBundleDocumentTypes: winit can't receive Finder's "Open With" events yet, so files are opened by dropping

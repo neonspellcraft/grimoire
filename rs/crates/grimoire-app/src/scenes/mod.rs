@@ -71,6 +71,16 @@ impl SceneKind {
         }
     }
 
+    /// Menu title for `reseed()`.
+    pub fn reseed_title(self) -> &'static str {
+        match self {
+            SceneKind::ThreeBody => "New Orbit",
+            SceneKind::Viewscreen => "New Course",
+            SceneKind::Spellrun => "New World",
+            SceneKind::Splatter => "Fresh Canvas",
+        }
+    }
+
     pub fn make(self, device: &wgpu::Device, format: wgpu::TextureFormat) -> Result<Box<dyn WindowScene>, String> {
         match self {
             SceneKind::ThreeBody => Ok(Box::new(ThreeBodyScene::new(device, format))),

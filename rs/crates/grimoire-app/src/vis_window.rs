@@ -11,6 +11,7 @@ use winit::window::Fullscreen;
 use crate::feed::AudioFeed;
 use crate::gpu::{Gpu, WindowSurface};
 use crate::library::Library;
+use crate::menus::{popup, Entry};
 use crate::scenes::{SceneKind, WindowScene};
 
 pub struct VisWindow {
@@ -23,6 +24,7 @@ pub struct VisWindow {
     pub occluded: bool,
     /// On by default; turned off, only the mouse (double-click for full screen) and Esc work here.
     pub shortcuts: bool,
+    control_down: bool,
 }
 
 /// Whether the visualizer window wants to close.
@@ -36,7 +38,7 @@ impl VisWindow {
             Err(_) => (SceneKind::ThreeBody, SceneKind::ThreeBody.make(&gpu.device, surface.view_format)?),
         };
         surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
-        Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false, shortcuts: true })
+        Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false, shortcuts: true, control_down: false })
     }
 
     /// Swaps in a fresh instance of `kind`; the old scene and its GPU resources are released.
@@ -74,6 +76,14 @@ impl VisWindow {
             WindowEvent::Occluded(occluded) => {
                 self.occluded = *occluded;
                 self.last_frame = None;
+            }
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => self.context_menu(gpu),
+            WindowEvent::ModifiersChanged(modifiers) => self.control_down = modifiers.state().control_key(),
+            // Control-click is a right-click on macOS.
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. }
+                if cfg!(target_os = "macos") && self.control_down =>
+            {
+                self.context_menu(gpu)
             }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
                 let now = Instant::now();
@@ -123,6 +133,36 @@ impl VisWindow {
             },
             _ => {}
         }
+    }
+
+    /// Right-click: two labeled sections, so choosing a scene isn't confused with the current scene's own actions.
+    fn context_menu(&mut self, gpu: &Gpu) {
+        enum Command {
+            Scene(SceneKind),
+            Reseed,
+            Meters,
+            FullScreen,
+        }
+        let mut entries = vec![Entry::Header("Scene".into())];
+        for kind in SceneKind::ALL {
+            entries.push(Entry::Check(kind.title().into(), kind == self.kind, Command::Scene(kind)));
+        }
+        entries.extend([
+            Entry::Separator,
+            Entry::Header(self.kind.title().into()),
+            Entry::Item(self.kind.reseed_title().into(), Command::Reseed),
+            Entry::Check("Show Band Meters".into(), self.show_meters, Command::Meters),
+            Entry::Separator,
+            Entry::Item("Toggle Full Screen".into(), Command::FullScreen),
+        ]);
+        match popup(&self.surface.window, entries) {
+            Some(Command::Scene(kind)) => self.select(gpu, kind),
+            Some(Command::Reseed) => self.scene.reseed(),
+            Some(Command::Meters) => self.show_meters = !self.show_meters,
+            Some(Command::FullScreen) => self.toggle_fullscreen(),
+            None => {}
+        }
+        self.last_click = None;
     }
 
     pub fn reseed(&mut self) {

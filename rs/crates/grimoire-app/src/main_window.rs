@@ -15,6 +15,7 @@ use winit::window::{CursorIcon, ResizeDirection, Window};
 use crate::feed::AudioFeed;
 use crate::gpu::{Gpu, WindowSurface};
 use crate::library::{format_line, matches, Library};
+use crate::menus::{popup, reveal, Entry};
 use crate::scenes::SceneKind;
 use crate::ui::layout::{self, list_rows, MIN_COLS, MIN_ROWS};
 use crate::ui::screen::CellRect;
@@ -259,6 +260,15 @@ impl MainWindow {
                 self.pointer_moved(library);
             }
             WindowEvent::CursorLeft { .. } => self.cursor = PhysicalPosition::new(-1.0, -1.0),
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => {
+                return self.context_menu(library);
+            }
+            // Control-click is a right-click on macOS.
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. }
+                if cfg!(target_os = "macos") && self.modifiers.control_key() =>
+            {
+                return self.context_menu(library);
+            }
             WindowEvent::MouseInput { state, button: MouseButton::Left, .. } => match state {
                 ElementState::Pressed => return self.pressed(library),
                 ElementState::Released => self.released(library),
@@ -396,6 +406,95 @@ impl MainWindow {
             }
             Action::ToggleMeters => return Some(Request::SetMeters(!self.show_meters)),
             Action::Reseed => return Some(Request::Reseed),
+        }
+        None
+    }
+
+    /// Right-click: a track menu over the playlist, the app menu anywhere else.
+    fn context_menu(&mut self, library: &mut Library) -> Option<Request> {
+        enum Command {
+            Play,
+            Remove,
+            Reveal,
+            SelectAll,
+            Clear,
+            Open,
+            Visualizer,
+            Settings,
+            Shuffle,
+            Repeat,
+            Quit,
+        }
+        let row = match self.action_under_pointer() {
+            Some((Action::Row(i) | Action::RemoveRow(i), _)) => self.visible.get(i).copied(),
+            _ => None,
+        };
+        let entries = if let Some(id) = row {
+            // Right-clicking outside the selection selects that track first, as in Finder.
+            if !self.selection.contains(id) {
+                self.selection.only(id);
+            }
+            let count = self.selection.tracks.len();
+            let mut entries = vec![
+                Entry::Item("Play".into(), Command::Play),
+                Entry::Item(if count == 1 { "Remove".into() } else { format!("Remove {count} Tracks") }, Command::Remove),
+            ];
+            if count == 1 {
+                let label = if cfg!(target_os = "windows") { "Show in Explorer" } else { "Show in Finder" };
+                entries.push(Entry::Item(label.into(), Command::Reveal));
+            }
+            entries.extend([
+                Entry::Separator,
+                Entry::Item("Select All".into(), Command::SelectAll),
+                Entry::Item("Clear Playlist".into(), Command::Clear),
+            ]);
+            entries
+        } else {
+            let repeat = match library.playlist.repeat_mode {
+                grimoire_core::RepeatMode::Off => "Off",
+                grimoire_core::RepeatMode::All => "All",
+                grimoire_core::RepeatMode::One => "One",
+            };
+            vec![
+                Entry::Item("Open Files…".into(), Command::Open),
+                Entry::Check("Visualizer".into(), self.visualizer_open, Command::Visualizer),
+                Entry::Check("Settings".into(), self.settings_open, Command::Settings),
+                Entry::Separator,
+                Entry::Check("Shuffle".into(), library.playlist.shuffle(), Command::Shuffle),
+                Entry::Item(format!("Repeat: {repeat}"), Command::Repeat),
+                Entry::Separator,
+                Entry::Item("Quit Grimoire".into(), Command::Quit),
+            ]
+        };
+        self.last_click = None;
+        match popup(&self.surface.window, entries)? {
+            Command::Play => {
+                if let Some(id) = self.selection.anchor {
+                    library.play(id);
+                }
+            }
+            Command::Remove => {
+                library.remove(&self.selection.tracks);
+                self.selection.clear();
+            }
+            Command::Reveal => {
+                let path = self.selection.anchor.and_then(|id| library.playlist.tracks().iter().find(|t| t.id == id));
+                if let Some(track) = path {
+                    reveal(&track.path);
+                }
+            }
+            Command::SelectAll => self.selection.select_all(&self.filtered),
+            Command::Clear => {
+                let all = library.playlist.tracks().iter().map(|t| t.id).collect();
+                library.remove(&all);
+                self.selection.clear();
+            }
+            Command::Open => self.open_dialog(library),
+            Command::Visualizer => return Some(Request::ToggleVisualizer),
+            Command::Settings => self.settings_open = !self.settings_open,
+            Command::Shuffle => library.toggle_shuffle(),
+            Command::Repeat => library.cycle_repeat(),
+            Command::Quit => return Some(Request::Quit),
         }
         None
     }
