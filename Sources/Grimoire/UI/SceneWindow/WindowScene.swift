@@ -20,10 +20,12 @@ protocol WindowScene: AnyObject {
 
 enum WindowSceneKind: String, CaseIterable {
     case threeBody
+    case viewscreen
 
     var title: String {
         switch self {
         case .threeBody: "Three-Body"
+        case .viewscreen: "Viewscreen"
         }
     }
 
@@ -31,6 +33,7 @@ enum WindowSceneKind: String, CaseIterable {
     var reseedTitle: String {
         switch self {
         case .threeBody: "New Orbit"
+        case .viewscreen: "New Course"
         }
     }
 
@@ -38,6 +41,7 @@ enum WindowSceneKind: String, CaseIterable {
     func make(device: MTLDevice, colorPixelFormat: MTLPixelFormat) throws -> WindowScene {
         switch self {
         case .threeBody: try ThreeBodyScene(device: device, colorPixelFormat: colorPixelFormat)
+        case .viewscreen: try ViewscreenScene(device: device, colorPixelFormat: colorPixelFormat)
         }
     }
 }

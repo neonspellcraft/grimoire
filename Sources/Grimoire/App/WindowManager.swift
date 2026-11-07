@@ -62,6 +62,16 @@ final class WindowManager {
         setVisualizerVisible(!isVisualizerVisible)
     }
 
+    /// Switches the visualizer window's scene, opening the window if it's closed.
+    func selectScene(_ kind: WindowSceneKind) {
+        if let host = visualizer?.contentView as? SceneHostView {
+            host.select(kind)
+        } else {
+            SceneHostView.savedKind = kind
+        }
+        if !isVisualizerVisible { setVisualizerVisible(true) }
+    }
+
     func minimize() {
         main.miniaturize(nil)
     }

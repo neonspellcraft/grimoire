@@ -73,6 +73,8 @@ final class ThreeBodyScene: WindowScene {
         next.rotate(by: .random(in: 0..<(2 * .pi)))
         next.perturb(0.04)
         system = next
+        // Drop the feedback buffers so the old trails vanish and the restart is obvious.
+        textures = []
     }
 
     /// The figure-eight, softened and in a gentle bowl so all three bodies keep dancing instead of decaying into

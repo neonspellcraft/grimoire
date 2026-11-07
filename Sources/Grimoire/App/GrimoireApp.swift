@@ -96,6 +96,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(item("Toggle Playlist", #selector(togglePlaylist), "l"))
         windowMenu.addItem(item("Toggle Visualizer Window", #selector(toggleVisualizer), "v", [.command, .shift]))
+        let sceneMenu = NSMenu(title: "Visualizer Scene")
+        for kind in WindowSceneKind.allCases {
+            let sceneItem = item(kind.title, #selector(selectScene(_:)), "")
+            sceneItem.representedObject = kind.rawValue
+            sceneMenu.addItem(sceneItem)
+        }
+        addSubmenu(sceneMenu, titled: "Visualizer Scene", to: windowMenu)
         windowMenu.addItem(item("Minimize", #selector(minimize), "m"))
         windowMenu.addItem(.separator())
         let visualizationMenu = NSMenu(title: "Visualization")
@@ -141,6 +148,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleVisualizer() { windows.toggleVisualizer() }
     @objc private func minimize() { windows.minimize() }
 
+    @objc private func selectScene(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let kind = WindowSceneKind(rawValue: raw) else { return }
+        windows.selectScene(kind)
+    }
+
     @objc private func selectVisualization(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let kind = VisualizationKind(rawValue: raw) else { return }
         player.visualization = kind
@@ -148,10 +160,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: NSMenuItemValidation {
-    /// Checks the active visualization in the menu; everything else stays enabled.
+    /// Checks the active visualization and scene in the menu; everything else stays enabled.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(selectVisualization(_:)) {
             menuItem.state = (menuItem.representedObject as? String) == player.visualization.rawValue ? .on : .off
+        }
+        if menuItem.action == #selector(selectScene(_:)) {
+            menuItem.state = (menuItem.representedObject as? String) == SceneHostView.savedKind.rawValue ? .on : .off
         }
         return true
     }

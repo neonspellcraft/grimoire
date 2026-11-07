@@ -29,7 +29,7 @@ Requires macOS 14+.
 - **Space** plays/pauses, **← / →** seek 5 s, **⌘O** opens files, **⌘⇧O** opens a folder, **⌘L** shows/hides the playlist, **⌘S** saves the playlist.
 - Click the time to switch between elapsed and remaining.
 - Click the visualizer to cycle **Spectrum → Oscilloscope → Off**, or right-click it / use Window → Visualization.
-- **VIS** (or **⌘⇧V**) opens the visualizer window. Resize it, drag it anywhere, and double-click for full screen. Right-click it for scene options, a new orbit and band meters.
+- **VIS** (or **⌘⇧V**) opens the visualizer window. Resize it, drag it anywhere, and double-click for full screen. Pick a scene from Window → Visualizer Scene or by right-clicking the window, which also has band meters and an option to restart the scene.
 - Drag the playlist away to float it. Drag it back under the main window to dock it.
 - Media keys and Control Center work. The playlist is restored on the next launch.
 
@@ -57,3 +57,10 @@ To add a style, write a class that conforms to `Visualization` (in `UI/Visualize
 - A thermostat and a gentle bowl keep the chaotic dance in frame.
 
 The shader draws the bodies' gravitational field as flowing rings, with feedback trails smeared along the pull of gravity. Bass pulses and zooms the image, the mids swirl it and shift its colors, and the highs add sparkle and a split-color edge.
+
+**Viewscreen** (`ViewscreenScene`) is the view out the front of a starship, with the music as the engine:
+- **Low = throttle.** It controls a 2,120-star 3D field in four depth layers, where near stars move faster. The response is deliberately laggy, so kicks feel like thrust surges, and stars stretch into warp streaks as the throttle climbs. It idles at a slow drift and never fully stops.
+- **Mid = environment.** It sets how opaque and how saturated the drifting nebula is, and the nebula's hue slowly drifts.
+- **High = sparkle.** Near stars twinkle, shooting stars streak by, and strong hits put a faint glint on the glass.
+
+The camera sways and rolls slowly, and banks a little on sustained bass. A minimal HUD shows a bezel, a reticle, a heading tape and a throttle readout. Every 30–90 s a planet, moon or asteroid field drifts past on one side. All the colors live in `ViewscreenPalette`.

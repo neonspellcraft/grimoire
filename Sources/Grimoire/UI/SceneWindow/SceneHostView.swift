@@ -13,6 +13,12 @@ final class SceneHostView: MTKView, MTKViewDelegate {
         static let meters = "showBandMeters"
     }
 
+    /// The scene chosen last time (or the default), whether or not the window exists yet.
+    static var savedKind: WindowSceneKind {
+        get { UserDefaults.standard.string(forKey: Keys.scene).flatMap(WindowSceneKind.init) ?? .threeBody }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: Keys.scene) }
+    }
+
     private weak var player: PlayerController?
     private let reader: TapReader
     private let analyzer = MultibandAnalyzer()
@@ -29,7 +35,7 @@ final class SceneHostView: MTKView, MTKViewDelegate {
         self.player = player
         reader = TapReader(tap: player.audioTap)
         commandQueue = queue
-        kind = UserDefaults.standard.string(forKey: Keys.scene).flatMap(WindowSceneKind.init) ?? .threeBody
+        kind = Self.savedKind
         showMeters = UserDefaults.standard.bool(forKey: Keys.meters)
         super.init(frame: .zero, device: device)
         colorPixelFormat = .bgra8Unorm
@@ -103,8 +109,10 @@ final class SceneHostView: MTKView, MTKViewDelegate {
         }
     }
 
+    /// Two labeled sections, so choosing a scene isn't confused with the current scene's own actions.
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
+        menu.addItem(.sectionHeader(title: "Scene"))
         for option in WindowSceneKind.allCases {
             let item = NSMenuItem(title: option.title, action: #selector(chooseScene(_:)), keyEquivalent: "")
             item.target = self
@@ -113,6 +121,7 @@ final class SceneHostView: MTKView, MTKViewDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
+        menu.addItem(.sectionHeader(title: kind.title))
         let reseed = NSMenuItem(title: kind.reseedTitle, action: #selector(reseedScene), keyEquivalent: "")
         reseed.target = self
         menu.addItem(reseed)
@@ -127,11 +136,18 @@ final class SceneHostView: MTKView, MTKViewDelegate {
         return menu
     }
 
-    @objc private func chooseScene(_ item: NSMenuItem) {
-        guard let raw = item.representedObject as? String, let option = WindowSceneKind(rawValue: raw), option != kind else { return }
+    /// Swaps in a fresh instance of `option`; the old scene and its GPU resources are released.
+    func select(_ option: WindowSceneKind) {
+        guard option != kind else { return }
         kind = option
-        UserDefaults.standard.set(option.rawValue, forKey: Keys.scene)
+        Self.savedKind = option
         loadScene()
+        lastTimestamp = nil
+    }
+
+    @objc private func chooseScene(_ item: NSMenuItem) {
+        guard let raw = item.representedObject as? String, let option = WindowSceneKind(rawValue: raw) else { return }
+        select(option)
     }
 
     @objc private func reseedScene() {

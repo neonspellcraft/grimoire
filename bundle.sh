@@ -10,8 +10,8 @@ ARCH_FLAGS=()
 if [[ "$CONFIG" == "release" && -z "${NATIVE_ONLY:-}" ]]; then
     ARCH_FLAGS=(--arch arm64 --arch x86_64)
 fi
-swift build -c "$CONFIG" "${ARCH_FLAGS[@]}"
-BIN_DIR="$(swift build -c "$CONFIG" "${ARCH_FLAGS[@]}" --show-bin-path)"
+swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
+BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)"
 
 APP="build/Grimoire.app"
 rm -rf "$APP"
