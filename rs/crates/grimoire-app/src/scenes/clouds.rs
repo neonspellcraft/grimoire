@@ -4,6 +4,8 @@
 //! - MID: the drift speeds up a little, and the moonlit cloud edges shimmer.
 //! - HIGH: the stars twinkle.
 //! - Kicks: the moon's glow brightens softly and fades over a few seconds.
+//! - MID also wakes the faint aurora; a drop (loud after quiet) sends a shooting star across the sky, and now and
+//!   then one falls on its own.
 
 use super::{fullscreen_pipeline, SceneAudio, WindowScene};
 
@@ -12,7 +14,9 @@ use super::{fullscreen_pipeline, SceneAudio, WindowScene};
 struct Uniforms {
     view: [f32; 4],
     drift: [f32; 4],
+    drift2: [f32; 4],
     mood: [f32; 4],
+    meteor: [f32; 4],
     meters: [f32; 4],
 }
 
@@ -23,6 +27,13 @@ pub struct CloudsScene {
     time: f64,
     far: [f64; 2],
     near: [f64; 2],
+    high: [f64; 2],
+    aurora: f64,
+    /// The shooting star: start (uv), heading, progress (None when there isn't one).
+    meteor: Option<[f64; 4]>,
+    next_meteor: f64,
+    fast_level: f64,
+    slow_level: f64,
     swell: f64,
     shimmer: f64,
     twinkle: f64,
@@ -74,6 +85,12 @@ impl CloudsScene {
             time: 0.0,
             far: [fastrand::f64() * 50.0, fastrand::f64() * 50.0],
             near: [fastrand::f64() * 50.0, fastrand::f64() * 50.0],
+            high: [fastrand::f64() * 50.0, fastrand::f64() * 50.0],
+            aurora: fastrand::f64() * 100.0,
+            meteor: None,
+            next_meteor: 40.0 + fastrand::f64() * 60.0,
+            fast_level: 0.0,
+            slow_level: 0.0,
             swell: 0.0,
             shimmer: 0.0,
             twinkle: 0.0,
@@ -99,6 +116,28 @@ impl WindowScene for CloudsScene {
         self.far[1] += dt * wind * 0.05;
         self.near[0] += dt * wind;
         self.near[1] += dt * wind * 0.08;
+        self.high[0] += dt * wind * 0.35;
+        self.aurora += dt * (0.25 + 0.6 * self.shimmer);
+
+        // Shooting stars: on a drop (it just got loud after a quiet stretch), or every minute or two on their own.
+        let loudness = audio.levels.loudest() as f64;
+        ease(&mut self.fast_level, loudness, 2.0, dt);
+        ease(&mut self.slow_level, loudness, 8.0, dt);
+        let drop = self.fast_level > 0.6 && self.slow_level < 0.4;
+        self.next_meteor -= dt;
+        if self.meteor.is_none() && (self.next_meteor <= 0.0 || (drop && self.next_meteor < 60.0)) {
+            // Starts high on the left half of the sky, heading down and to one side.
+            let heading = if fastrand::bool() { 0.35 } else { std::f64::consts::PI - 0.35 } + (fastrand::f64() - 0.5) * 0.4;
+            let x = if heading < 1.0 { 0.05 + 0.3 * fastrand::f64() } else { 0.35 + 0.3 * fastrand::f64() };
+            self.meteor = Some([x, 0.06 + 0.2 * fastrand::f64(), heading, 0.0]);
+            self.next_meteor = 60.0 + fastrand::f64() * 90.0;
+        }
+        if let Some(meteor) = &mut self.meteor {
+            meteor[3] += dt / 1.2;
+            if meteor[3] >= 1.0 {
+                self.meteor = None;
+            }
+        }
     }
 
     fn encode(
@@ -120,7 +159,9 @@ impl WindowScene for CloudsScene {
                 (self.near[0] % 1000.0) as f32,
                 (self.near[1] % 1000.0) as f32,
             ],
+            drift2: [(self.high[0] % 1000.0) as f32, (self.high[1] % 1000.0) as f32, (self.aurora % 10_000.0) as f32, 0.0],
             mood: [self.swell as f32, self.shimmer as f32, self.twinkle as f32, self.glow as f32],
+            meteor: self.meteor.map_or([0.0, 0.0, 0.0, -1.0], |m| m.map(|v| v as f32)),
             meters: [levels.low, levels.mid, levels.high, if show_meters { 1.0 } else { 0.0 }],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&uniforms));
@@ -134,5 +175,6 @@ impl WindowScene for CloudsScene {
         // A different patch of sky.
         self.far = [fastrand::f64() * 500.0, fastrand::f64() * 500.0];
         self.near = [fastrand::f64() * 500.0, fastrand::f64() * 500.0];
+        self.high = [fastrand::f64() * 500.0, fastrand::f64() * 500.0];
     }
 }

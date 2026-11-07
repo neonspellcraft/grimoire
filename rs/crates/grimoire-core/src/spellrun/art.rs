@@ -10,6 +10,36 @@ pub enum Backdrop {
     Pines,
     Crystals,
     Castle,
+    /// Giant glowing mushrooms between the hills.
+    Mushrooms,
+    /// Jagged ash peaks and a smouldering volcano.
+    Volcano,
+    /// Sharp ice spires.
+    Glacier,
+    /// Broken temple columns, under water.
+    Ruins,
+    /// Towering bookshelves and arches.
+    Library,
+    /// Islands floating in a starry void.
+    Islands,
+}
+
+/// Ambient particles drifting through a biome (drawn from a hash of time, so they cost the game nothing).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Weather {
+    Clear,
+    /// Blinking fireflies that pulse with the highs.
+    Fireflies,
+    /// Glowing spores rising slowly.
+    Spores,
+    /// Embers flickering upward.
+    Embers,
+    /// Snow drifting down.
+    Snow,
+    /// Bubbles wobbling upward.
+    Bubbles,
+    /// Golden dust motes hanging in the air.
+    Dust,
 }
 
 /// A biome's look: its palette and the shape of its parallax backdrop.
@@ -35,9 +65,11 @@ pub struct Biome {
     pub has_clouds: bool,
     /// The sun or moon, if the biome has one.
     pub orb: Option<u32>,
+    pub weather: Weather,
+    pub weather_color: u32,
 }
 
-pub static BIOMES: [Biome; 4] = [
+pub static BIOMES: [Biome; 10] = [
     Biome {
         name: "Sunlit Meadow",
         sky_top: rgb(0x4A8FE7),
@@ -58,6 +90,8 @@ pub static BIOMES: [Biome; 4] = [
         has_stars: false,
         has_clouds: true,
         orb: Some(rgb(0xFFF1A8)),
+        weather: Weather::Clear,
+        weather_color: rgb(0xFFFFFF),
     },
     Biome {
         name: "Dusk Forest",
@@ -79,6 +113,54 @@ pub static BIOMES: [Biome; 4] = [
         has_stars: false,
         has_clouds: true,
         orb: Some(rgb(0xFFC27A)),
+        weather: Weather::Fireflies,
+        weather_color: rgb(0xFFE680),
+    },
+    Biome {
+        name: "Mushroom Hollow",
+        sky_top: rgb(0x1E1236),
+        sky_bottom: rgb(0x5B3A7A),
+        far: rgb(0x4A2E66),
+        near: rgb(0x2C1E48),
+        near_shade: rgb(0x1E1433),
+        ground_top: rgb(0x5FD6A8),
+        ground_top_shade: rgb(0x3A9C7C),
+        ground_fill: rgb(0x4A3550),
+        ground_dark: rgb(0x2F2236),
+        platform: rgb(0xD9667A),
+        platform_shade: rgb(0x9C3F57),
+        block: rgb(0x3E2A66),
+        block_glow: rgb(0xFF9CE6),
+        accent: rgb(0x9CFFE0),
+        backdrop: Backdrop::Mushrooms,
+        has_stars: false,
+        has_clouds: false,
+        orb: None,
+        weather: Weather::Spores,
+        weather_color: rgb(0xB8FFE8),
+    },
+    Biome {
+        name: "Frost Peaks",
+        sky_top: rgb(0x2B4C8C),
+        sky_bottom: rgb(0xCFE8FF),
+        far: rgb(0xA9C4E6),
+        near: rgb(0x7FA3CF),
+        near_shade: rgb(0x6288B8),
+        ground_top: rgb(0xF4FBFF),
+        ground_top_shade: rgb(0xBFD8EE),
+        ground_fill: rgb(0x6B7FA0),
+        ground_dark: rgb(0x4C5C7A),
+        platform: rgb(0x9FD8F0),
+        platform_shade: rgb(0x6AA8CC),
+        block: rgb(0x3E5C9A),
+        block_glow: rgb(0xBFF4FF),
+        accent: rgb(0x8FF0FF),
+        backdrop: Backdrop::Glacier,
+        has_stars: false,
+        has_clouds: true,
+        orb: Some(rgb(0xFFFDF0)),
+        weather: Weather::Snow,
+        weather_color: rgb(0xFFFFFF),
     },
     Biome {
         name: "Crystal Cavern",
@@ -100,6 +182,54 @@ pub static BIOMES: [Biome; 4] = [
         has_stars: true,
         has_clouds: false,
         orb: None,
+        weather: Weather::Spores,
+        weather_color: rgb(0x9CF6FF),
+    },
+    Biome {
+        name: "Ember Wastes",
+        sky_top: rgb(0x2A0A12),
+        sky_bottom: rgb(0xC2462A),
+        far: rgb(0x5A1E22),
+        near: rgb(0x2E1416),
+        near_shade: rgb(0x1C0C0E),
+        ground_top: rgb(0x6B5A55),
+        ground_top_shade: rgb(0x4A3D3A),
+        ground_fill: rgb(0x3A2624),
+        ground_dark: rgb(0x241615),
+        platform: rgb(0x8C4A30),
+        platform_shade: rgb(0x5C2E1E),
+        block: rgb(0x4A1E2A),
+        block_glow: rgb(0xFFB347),
+        accent: rgb(0xFF6A3D),
+        backdrop: Backdrop::Volcano,
+        has_stars: false,
+        has_clouds: false,
+        orb: Some(rgb(0xFF8A5C)),
+        weather: Weather::Embers,
+        weather_color: rgb(0xFFAA55),
+    },
+    Biome {
+        name: "Sunken Temple",
+        sky_top: rgb(0x04303A),
+        sky_bottom: rgb(0x0E7A7E),
+        far: rgb(0x0A434C),
+        near: rgb(0x0A3F48),
+        near_shade: rgb(0x072E35),
+        ground_top: rgb(0xD8C890),
+        ground_top_shade: rgb(0xAE9C68),
+        ground_fill: rgb(0x5E6E6A),
+        ground_dark: rgb(0x3E4C4A),
+        platform: rgb(0x8FB8A8),
+        platform_shade: rgb(0x5E8478),
+        block: rgb(0x205A6A),
+        block_glow: rgb(0x8CFFE4),
+        accent: rgb(0xFF8C7A),
+        backdrop: Backdrop::Ruins,
+        has_stars: false,
+        has_clouds: false,
+        orb: None,
+        weather: Weather::Bubbles,
+        weather_color: rgb(0xBFF6FF),
     },
     Biome {
         name: "Starlit Ramparts",
@@ -121,6 +251,54 @@ pub static BIOMES: [Biome; 4] = [
         has_stars: true,
         has_clouds: false,
         orb: Some(rgb(0xF4F1D8)),
+        weather: Weather::Clear,
+        weather_color: rgb(0xFFFFFF),
+    },
+    Biome {
+        name: "Arcane Library",
+        sky_top: rgb(0x1A1020),
+        sky_bottom: rgb(0x3A2420),
+        far: rgb(0x5C3E2A),
+        near: rgb(0x34221A),
+        near_shade: rgb(0x1C1210),
+        ground_top: rgb(0xB0804A),
+        ground_top_shade: rgb(0x7A5430),
+        ground_fill: rgb(0x4A3428),
+        ground_dark: rgb(0x30221A),
+        platform: rgb(0x6A4A8A),
+        platform_shade: rgb(0x4A3266),
+        block: rgb(0x3A2A5A),
+        block_glow: rgb(0xFFD27A),
+        accent: rgb(0xFFE38A),
+        backdrop: Backdrop::Library,
+        has_stars: false,
+        has_clouds: false,
+        orb: None,
+        weather: Weather::Dust,
+        weather_color: rgb(0xFFE7A8),
+    },
+    Biome {
+        name: "Astral Isles",
+        sky_top: rgb(0x0A0620),
+        sky_bottom: rgb(0x3A1E6A),
+        far: rgb(0x2A1A50),
+        near: rgb(0x1E1440),
+        near_shade: rgb(0x140C2E),
+        ground_top: rgb(0xB48CFF),
+        ground_top_shade: rgb(0x8060CC),
+        ground_fill: rgb(0x3A2A66),
+        ground_dark: rgb(0x261A46),
+        platform: rgb(0x7CE8FF),
+        platform_shade: rgb(0x4AA8C8),
+        block: rgb(0x2E1E5A),
+        block_glow: rgb(0xFF9CF2),
+        accent: rgb(0x9CFFF0),
+        backdrop: Backdrop::Islands,
+        has_stars: true,
+        has_clouds: false,
+        orb: Some(rgb(0xFFD9F4)),
+        weather: Weather::Clear,
+        weather_color: rgb(0xFFFFFF),
     },
 ];
 
@@ -130,6 +308,8 @@ pub struct Art {
     pub hero_run: [Sprite; 2],
     pub hero_jump: Sprite,
     pub hero_pound: Sprite,
+    /// Staff thrust forward, casting (16 wide: the staff reaches past the usual 12).
+    pub hero_cast: [Sprite; 2],
     pub slime: [Sprite; 2],
     pub slime_squished: Sprite,
     pub bat: [Sprite; 2],
@@ -185,6 +365,29 @@ pub static ART: LazyLock<Art> = LazyLock::new(|| {
         hero_run: [hero_with(["..kb..kb..w.", ".kb....kb.w."]), hero_with(["...kbkb...w.", "...kb.kb..w."])],
         hero_jump: hero_with(["..kbkb....w.", "..........w."]),
         hero_pound: hero_with([".kbk..kbk.w.", "..........w."]),
+        hero_cast: {
+            let top = [
+                ".kk.............",
+                ".khk............",
+                "..khk...........",
+                "..khhk..........",
+                "..khyhk.........",
+                ".khhhhhk........",
+                "kkkkkkkkk.......",
+                "..ksseskk.......",
+                "..ksssssk.......",
+                "..khhhhkk.....g.",
+                ".khhhhhhsswwwgGg",
+                ".khhhhhHk.....g.",
+                "khhhhhhHHk......",
+                "kHHHHHHHHk......",
+            ];
+            let cast_with = |legs: [&'static str; 2]| {
+                let rows: Vec<&str> = top.iter().copied().chain(legs).collect();
+                Sprite::new(&rows, &hero)
+            };
+            [cast_with(["..kb..kb........", ".kb....kb......."]), cast_with(["..kbkb..........", "................"])]
+        },
         slime: [
             Sprite::new(
                 &[

@@ -195,7 +195,7 @@ impl VisWindow {
                 "f" => self.toggle_fullscreen(),
                 "m" => self.show_meters = !self.show_meters,
                 "r" => self.scene.reseed(),
-                digit @ ("1" | "2" | "3" | "4" | "5" | "6" | "7") => {
+                digit @ ("1" | "2" | "3" | "4" | "5" | "6" | "7" | "8") => {
                     let index = digit.parse::<usize>().unwrap() - 1;
                     self.select(gpu, SceneKind::ALL[index]);
                 }

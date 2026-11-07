@@ -233,7 +233,13 @@ pub struct Hero {
     boost_cooldown: f64,
     pub boost_glow: f64,
     cast_cooldown: f64,
+    /// > 0 while showing the casting pose.
+    pub cast_time: f64,
     stuck: f64,
+    /// A kick that landed just before touching down, hopped on as soon as the feet hit the ground.
+    kick_buffer: f64,
+    /// The current hop was a beat hop (so its landing gets a puff of dust).
+    beat_hop: bool,
 }
 
 impl Default for Hero {
@@ -251,7 +257,10 @@ impl Default for Hero {
             boost_cooldown: 0.0,
             boost_glow: 0.0,
             cast_cooldown: 0.0,
+            cast_time: 0.0,
             stuck: 0.0,
+            kick_buffer: 0.0,
+            beat_hop: false,
         }
     }
 }
@@ -286,7 +295,58 @@ pub struct Mote {
 pub struct Bolt {
     pub x: f64,
     pub y: f64,
+    vx: f64,
+    vy: f64,
     life: f64,
+    pub color: u32,
+    /// Nova bolts (cast on a drop) are bigger.
+    pub big: bool,
+}
+
+/// Learns the tempo from the kicks: the median of recent kick-to-kick intervals.
+#[derive(Clone, Debug, Default)]
+pub struct BeatClock {
+    last: Option<f64>,
+    intervals: VecDeque<f64>,
+}
+
+impl BeatClock {
+    pub fn kick(&mut self, time: f64) {
+        if let Some(last) = self.last {
+            let interval = time - last;
+            if (0.22..=1.6).contains(&interval) {
+                self.intervals.push_back(interval);
+                if self.intervals.len() > 8 {
+                    self.intervals.pop_front();
+                }
+            } else if interval > 1.6 {
+                self.intervals.clear(); // the beat stopped; learn it again
+            }
+        }
+        self.last = Some(time);
+    }
+
+    /// Seconds per beat, once a few kicks have agreed.
+    pub fn period(&self) -> Option<f64> {
+        if self.intervals.len() < 3 {
+            return None;
+        }
+        let mut sorted: Vec<f64> = self.intervals.iter().copied().collect();
+        sorted.sort_by(f64::total_cmp);
+        Some(sorted[sorted.len() / 2])
+    }
+
+    /// How long a beat hop stays in the air: one beat (or a half or double of it), so he lands on the next kick.
+    pub fn airtime(&self) -> f64 {
+        let mut t = self.period().unwrap_or(0.46);
+        while t > 0.62 {
+            t /= 2.0;
+        }
+        while t < 0.3 {
+            t *= 2.0;
+        }
+        t
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -309,6 +369,7 @@ pub struct Stats {
     pub pounds: u32,
     pub boosts: u32,
     pub spells: u32,
+    pub kicks: u32,
     pub stomps: u32,
     pub blocks_shattered: u32,
 }
@@ -337,6 +398,9 @@ pub struct SpellrunGame {
     pub bolts: Vec<Bolt>,
     pub particles: Vec<Particle>,
     particle_cursor: usize,
+    pub beat: BeatClock,
+    combo: u32,
+    last_cast: f64,
     generator: LevelGenerator,
     rng: SplitMix64,
     biome_timer: f64,
@@ -349,7 +413,6 @@ impl SpellrunGame {
     pub const TILE: i64 = 16;
     const GRAVITY: f64 = 1000.0;
     const JUMP_SPEED: f64 = 340.0;
-    const HOP_SPEED: f64 = 230.0;
     const POUND_SPEED: f64 = -540.0;
     pub const MIN_RUN_SPEED: f64 = 95.0;
     const HERO_WIDTH: f64 = 10.0;
@@ -380,9 +443,12 @@ impl SpellrunGame {
             bolts: Vec::new(),
             particles: vec![Particle::default(); 320],
             particle_cursor: 0,
+            beat: BeatClock::default(),
+            combo: 0,
+            last_cast: -10.0,
             generator,
             rng: SplitMix64::new(seed.wrapping_add(1)),
-            biome_timer: 55.0,
+            biome_timer: 45.0,
             last_biome_change: 0.0,
             view_width: 256.0,
             view_height: 160.0,
@@ -414,12 +480,16 @@ impl SpellrunGame {
         self.view_width = view_width;
         self.view_height = view_height;
         self.time += dt;
+        if input.kick {
+            self.beat.kick(self.time);
+            self.stats.kicks += 1;
+        }
 
         self.generator.energy += (input.mid as f64 - self.generator.energy) * (1.0 - (-dt / 3.0).exp());
         self.biome_timer -= dt;
         if self.biome_timer <= 0.0 || (input.drop && self.time - self.last_biome_change > 15.0) {
             self.generator.biome = (self.generator.biome + 1) % BIOMES.len();
-            self.biome_timer = 50.0 + self.rng.unit() * 30.0;
+            self.biome_timer = 40.0 + self.rng.unit() * 25.0;
             self.last_biome_change = self.time;
         }
 
@@ -568,15 +638,22 @@ impl SpellrunGame {
                 n.platform >= 0 && previous_platform < 0 && to_edge < 6.0 && n.platform as f64 * tile > h.y
             }) {
                 Some(Self::JUMP_SPEED)
-            } else if self.input.kick && self.safe_to_hop(next_col - 1, h.y) {
+            } else if (self.input.kick || h.kick_buffer > 0.0) && self.hop_is_safe(&h) {
+                // Hop on the beat, high enough to stay up exactly one beat and land on the next kick.
                 self.stats.beat_hops += 1;
-                Some(Self::HOP_SPEED)
+                h.kick_buffer = 0.0;
+                h.beat_hop = true;
+                Some(Self::GRAVITY * self.beat.airtime() / 2.0)
             } else if h.stuck > 0.4 {
                 Some(Self::JUMP_SPEED)
             } else {
                 None
             };
+            h.kick_buffer = 0.0;
             if let Some(jump) = jump {
+                if jump == Self::JUMP_SPEED {
+                    h.beat_hop = false;
+                }
                 h.vy = jump;
                 h.grounded = false;
                 h.stuck = 0.0;
@@ -598,12 +675,16 @@ impl SpellrunGame {
                     self.stats.boosts += 1;
                     self.burst(center, h.y, rgb(0x74FFAD), 14, 70.0);
                 }
+            } else if self.input.kick && h.vy < 0.0 && !h.pounding && self.time_to_land(&h) < 0.12 {
+                // Touching down a moment after the kick: hop again the instant the feet land.
+                h.kick_buffer = 0.12;
             } else if self.input.big_kick && !h.pounding && !over_pit && h.vy < 80.0 && h.y - self.surface(center) > 24.0 {
                 h.vy = Self::POUND_SPEED;
                 h.pounding = true;
                 self.stats.pounds += 1;
             }
         }
+        h.kick_buffer = (h.kick_buffer - dt).max(0.0);
         h.boost_glow = (h.boost_glow - dt * 2.0).max(0.0);
         h.boost_cooldown -= dt;
         if !h.can_boost && h.boost_cooldown <= 0.0 {
@@ -611,11 +692,9 @@ impl SpellrunGame {
         }
 
         h.cast_cooldown -= dt;
-        if self.input.sparkle && h.cast_cooldown <= 0.0 {
-            self.bolts.push(Bolt { x: h.x + 11.0, y: h.y + 14.0, life: 0.9 });
-            h.cast_cooldown = 0.3;
-            self.stats.spells += 1;
-            self.burst(h.x + 11.0, h.y + 14.0, rgb(0x9FFFD0), 5, 40.0);
+        h.cast_time = (h.cast_time - dt).max(0.0);
+        if (self.input.sparkle || self.input.drop) && h.cast_cooldown <= 0.0 {
+            self.cast(&mut h);
         }
 
         // Horizontal: run, stopping at walls.
@@ -644,8 +723,11 @@ impl SpellrunGame {
             if h.pounding {
                 self.ground_pound(h.x + Self::HERO_WIDTH / 2.0, top);
                 h.pounding = false;
-            } else if !was_grounded && h.vy < -300.0 {
+            } else if !was_grounded && (h.vy < -300.0 || h.beat_hop) {
                 self.dust(h.x + Self::HERO_WIDTH / 2.0, top, 3);
+            }
+            if !was_grounded {
+                h.beat_hop = false;
             }
             h.vy = 0.0;
             h.grounded = true;
@@ -702,9 +784,58 @@ impl SpellrunGame {
         self.hero = h;
     }
 
-    fn safe_to_hop(&self, col: i64, y: f64) -> bool {
-        let level = (y / Self::TILE as f64).round() as i64;
-        (0..=4).all(|offset| self.column(col + offset).is_some_and(|c| c.ground == level))
+    /// A beat hop is safe when solid ground runs under its whole arc and nothing ahead rises higher than it goes.
+    fn hop_is_safe(&self, h: &Hero) -> bool {
+        let tile = Self::TILE as f64;
+        let airtime = self.beat.airtime();
+        let peak = Self::GRAVITY * airtime * airtime / 8.0;
+        let first = (h.x / tile).floor() as i64;
+        let last = ((h.x + Self::HERO_WIDTH + h.vx * airtime + 10.0) / tile).floor() as i64;
+        let hazard_ahead = self.enemies.iter().any(|e| {
+            e.kind == EnemyKind::Slime && !e.dead() && e.x > h.x && e.x - h.x < h.vx * airtime + 20.0 && (e.y - h.y).abs() < 8.0
+        });
+        !hazard_ahead
+            && (first..=last).all(|col| {
+                self.column(col).is_some_and(|c| c.ground > 0 && (c.ground as f64 * tile) <= h.y + peak * 0.7)
+            })
+    }
+
+    /// Rough seconds until a falling hero reaches the ground under them.
+    fn time_to_land(&self, h: &Hero) -> f64 {
+        let height = h.y - self.surface(h.x + Self::HERO_WIDTH / 2.0);
+        if height <= 0.0 {
+            return 0.0;
+        }
+        let v = -h.vy;
+        ((v * v + 2.0 * Self::GRAVITY * height).sqrt() - v) / Self::GRAVITY
+    }
+
+    /// Fires a spell from the staff: a bolt that seeks the nearest enemy ahead. Quick runs of hi-hats build a combo
+    /// (every fourth cast fans out three bolts), and a drop unleashes a nova of bolts in every direction.
+    fn cast(&mut self, h: &mut Hero) {
+        let (x, y) = (h.x + 15.0, h.y + 6.0);
+        let glow = self.biome().block_glow;
+        self.combo = if self.time - self.last_cast < 1.2 { self.combo + 1 } else { 1 };
+        self.last_cast = self.time;
+        h.cast_time = 0.16;
+        h.cast_cooldown = 0.09;
+        self.stats.spells += 1;
+        if self.input.drop {
+            for i in 0..12 {
+                let angle = i as f64 / 12.0 * 2.0 * PI;
+                self.bolts.push(Bolt { x, y, vx: angle.cos() * 240.0, vy: angle.sin() * 240.0, life: 0.7, color: glow, big: true });
+            }
+            h.cast_cooldown = 0.5;
+            self.shake = self.shake.max(0.6);
+            self.burst(x, y, glow, 24, 110.0);
+            return;
+        }
+        let spread: &[f64] = if self.combo % 4 == 0 { &[-0.28, 0.0, 0.28] } else { &[0.0] };
+        let color = if self.combo % 2 == 0 { glow } else { rgb(0x74FFAD) };
+        for &angle in spread {
+            self.bolts.push(Bolt { x, y, vx: angle.cos() * 300.0, vy: angle.sin() * 300.0, life: 0.9, color, big: false });
+        }
+        self.burst(x, y, mix(color, rgb(0xFFFFFF), 0.5), 5, 40.0);
     }
 
     fn ground_pound(&mut self, x: f64, y: f64) {
@@ -773,21 +904,47 @@ impl SpellrunGame {
 
     fn update_bolts(&mut self, dt: f64) {
         for i in 0..self.bolts.len() {
-            self.bolts[i].x += 280.0 * dt;
+            let b = self.bolts[i];
+            // Seek the nearest live enemy ahead: steer the heading toward it, keeping the speed.
+            let target = self
+                .enemies
+                .iter()
+                .filter(|e| !e.dead() && e.x + 6.0 > b.x && e.x - b.x < 170.0)
+                .min_by(|a, c| (a.x - b.x).abs().total_cmp(&(c.x - b.x).abs()));
+            if let (Some(e), false) = (target, b.big) {
+                let (dx, dy) = (e.x + 6.0 - b.x, e.y + 4.0 - b.y);
+                let speed = b.vx.hypot(b.vy);
+                let length = dx.hypot(dy).max(1.0);
+                let turn = 1.0 - (-dt / 0.12).exp();
+                let (vx, vy) = (b.vx + (dx / length * speed - b.vx) * turn, b.vy + (dy / length * speed - b.vy) * turn);
+                let scale = speed / vx.hypot(vy).max(1.0);
+                self.bolts[i].vx = vx * scale;
+                self.bolts[i].vy = vy * scale;
+            }
+            self.bolts[i].x += self.bolts[i].vx * dt;
+            self.bolts[i].y += self.bolts[i].vy * dt;
             self.bolts[i].life -= dt;
             let (bx, by) = (self.bolts[i].x, self.bolts[i].y);
             self.spawn_particle(Particle {
                 x: bx,
                 y: by,
-                vx: -20.0,
+                vx: -self.bolts[i].vx * 0.08,
                 vy: fastrand::f64() * 20.0 - 10.0,
                 life: 0.25,
                 max_life: 0.25,
-                color: rgb(0x74FFAD),
-                size: 1,
+                color: b.color,
+                size: if b.big { 2 } else { 1 },
                 gravity: 0.0,
             });
             let col = (bx / Self::TILE as f64).floor() as i64;
+            if self.bolts[i].life > 0.0 && self.is_solid(col, (by / Self::TILE as f64).floor() as i64) {
+                let c = self.column(col).copied();
+                if c.is_none_or(|c| c.block < 0 || (by / Self::TILE as f64).floor() as i64 != c.block) {
+                    self.bolts[i].life = 0.0;
+                    self.burst(bx, by, b.color, 4, 40.0);
+                    continue;
+                }
+            }
             if self.column(col).is_some_and(|c| c.block >= 0 && (by / Self::TILE as f64).floor() as i64 == c.block) {
                 self.shatter_block(col);
                 self.bolts[i].life = 0.0;
@@ -797,7 +954,8 @@ impl SpellrunGame {
                 if !e.dead() && bx > e.x && bx < e.x + 12.0 && by > e.y - 2.0 && by < e.y + 10.0 {
                     self.enemies[j].squish = 0.35;
                     self.bolts[i].life = 0.0;
-                    self.burst(e.x + 6.0, e.y + 4.0, rgb(0xFFD84D), 10, 80.0);
+                    self.burst(e.x + 6.0, e.y + 4.0, b.color, 6, 80.0);
+                    self.burst(e.x + 6.0, e.y + 4.0, rgb(0xFFD84D), 6, 60.0);
                     self.motes.push(Mote { x: e.x + 4.0, y: e.y + 4.0, phase: 0.0, rising: 0.3 });
                 }
             }
@@ -924,6 +1082,49 @@ mod tests {
                 .count()
         };
         assert!(features(1.0) > features(0.0));
+    }
+
+    #[test]
+    fn beat_clock_learns_the_tempo() {
+        let mut clock = BeatClock::default();
+        assert_eq!(clock.period(), None);
+        for i in 0..6 {
+            clock.kick(i as f64 * 0.5);
+        }
+        assert!((clock.period().unwrap() - 0.5).abs() < 1e-9);
+        assert!((clock.airtime() - 0.5).abs() < 1e-9);
+        // 60 bpm: one second per beat is too floaty, so he hops on every half beat instead.
+        let mut slow = BeatClock::default();
+        for i in 0..6 {
+            slow.kick(i as f64);
+        }
+        assert!((slow.airtime() - 0.5).abs() < 1e-9);
+    }
+
+    /// With a steady four-on-the-floor kick, the apprentice hops on most beats and still never falls in a pit.
+    #[test]
+    fn apprentice_hops_on_the_beat() {
+        for seed in 1u64..=5 {
+            let mut game = SpellrunGame::new(seed);
+            for frame in 0..60 * 90 {
+                let input = SpellrunInput { low: 0.7, mid: 0.5, high: 0.3, kick: frame % 30 == 0, ..Default::default() };
+                game.step(1.0 / 60.0, input, 256.0, 160.0);
+            }
+            let s = game.stats;
+            assert_eq!(game.respawns, 0, "seed {seed}");
+            assert!(s.beat_hops as f64 >= s.kicks as f64 * 0.45, "seed {seed}: only {} hops for {} kicks", s.beat_hops, s.kicks);
+        }
+    }
+
+    #[test]
+    fn hi_hats_cast_spells() {
+        let mut game = SpellrunGame::new(4);
+        for frame in 0..60 * 20 {
+            let input = SpellrunInput { high: 0.8, sparkle: frame % 8 == 0, ..Default::default() };
+            game.step(1.0 / 60.0, input, 256.0, 160.0);
+        }
+        // A hi-hat every 133 ms: every one of them casts.
+        assert!(game.stats.spells >= 145, "{} spells", game.stats.spells);
     }
 
     /// Two minutes of music-like input: the apprentice keeps moving forward and never falls into a pit.

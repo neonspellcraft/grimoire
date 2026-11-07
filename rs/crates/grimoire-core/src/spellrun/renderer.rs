@@ -1,7 +1,7 @@
 //! Draws a `SpellrunGame` into a `PixelCanvas` (port of `SpellrunRenderer.swift`): dithered sky, sun or moon,
 //! stars and clouds, two parallax backdrop layers, tiles, entities, particles and a tiny HUD.
 
-use super::art::{Backdrop, Biome, ART, BIOMES, OUTLINE, RUNES};
+use super::art::{Backdrop, Biome, Weather, ART, BIOMES, OUTLINE, RUNES};
 use super::canvas::{bayer, mix, rgb, PixelCanvas};
 use super::game::{EnemyKind, SpellrunGame};
 use crate::BandLevels;
@@ -28,9 +28,10 @@ impl SpellrunRenderer {
         self.camera_x = game.camera_x.floor() as i64 - shake_x;
         self.camera_y = game.camera_y.floor() as i64 + shake_y;
 
-        self.draw_backdrop(game, canvas, levels.high);
+        self.draw_backdrop(game, canvas, levels);
         self.draw_tiles(game, canvas, levels.low);
         self.draw_entities(game, canvas, levels.high);
+        self.draw_weather(game, canvas, levels);
         self.draw_hud(game, canvas, levels, show_meters);
     }
 
@@ -47,7 +48,8 @@ impl SpellrunRenderer {
 
     // Backdrop
 
-    fn draw_backdrop(&self, game: &SpellrunGame, canvas: &mut PixelCanvas, high: f32) {
+    fn draw_backdrop(&self, game: &SpellrunGame, canvas: &mut PixelCanvas, levels: BandLevels) {
+        let high = levels.high;
         let current = &BIOMES[game.biome_index];
         let previous = &BIOMES[game.previous_biome];
         let fade = game.biome_fade as f32;
@@ -67,10 +69,18 @@ impl SpellrunRenderer {
                 let far = if use_previous { far_before } else { far_now };
                 let near = if use_previous { near_before } else { near_now };
                 let from_bottom = height - y;
+                let prop_u = self.camera_x as f64 * 0.35 + x as f64;
                 let color = if from_bottom < near {
                     if from_bottom < near - 3 && bayer(x, y) < 0.5 { b.near_shade } else { b.near }
+                } else if let Some(prop) = self.prop(b, prop_u, x, from_bottom, game.time, levels.low) {
+                    prop
                 } else if from_bottom < far {
-                    b.far
+                    if b.backdrop == Backdrop::Library && (far_u as i64).rem_euclid(42) < 34 && (from_bottom % 13) > 1 {
+                        // Book spines on the shelves.
+                        mix(b.far, b.accent, 0.04 + 0.16 * hash((far_u / 3.0).floor() as i64, from_bottom / 13) as f32)
+                    } else {
+                        b.far
+                    }
                 } else {
                     let t = y as f32 / height as f32;
                     let band = (t * 7.0 + bayer(x, y) - 0.5).floor();
@@ -89,7 +99,7 @@ impl SpellrunRenderer {
         }
 
         if let Some(orb) = current.orb {
-            self.draw_orb(canvas, orb, current.has_stars);
+            self.draw_orb(canvas, orb, current.has_stars, levels.low);
         }
         if current.has_clouds {
             self.draw_clouds(canvas, current);
@@ -121,6 +131,49 @@ impl SpellrunRenderer {
                 let battlement = if is_tower && (local as i64) % 4 < 2 { 3.0 } else { 0.0 };
                 (base - 10.0 + tower + battlement) as i64
             }
+            // The mushrooms themselves are props (they overhang); behind them, low rolling hills.
+            Backdrop::Mushrooms => (base - 12.0 + 14.0 * noise(u * 0.015) + 4.0 * noise(u * 0.06)) as i64,
+            Backdrop::Volcano => {
+                let slot = (u / 150.0).floor();
+                let local = u - slot * 150.0;
+                let mut cone = if hash(slot as i64, 13) > 0.35 { 58.0 * (1.0 - (local - 75.0).abs() / 62.0).max(0.0) } else { 0.0 };
+                if cone > 0.0 && (local - 75.0).abs() < 7.0 {
+                    cone -= 7.0 - (local - 75.0).abs(); // the crater
+                }
+                let jag = 5.0 * hash((u / 3.0).floor() as i64, 14);
+                (base - 8.0 + 12.0 * noise(u * 0.02) + jag + cone) as i64
+            }
+            Backdrop::Glacier => {
+                let slot = (u / 11.0).floor();
+                let local = u - slot * 11.0;
+                let spire = (8.0 + 38.0 * hash(slot as i64, 15) * hash(slot as i64, 16)) * (1.0 - (local - 5.5).abs() / 5.5);
+                (base - 12.0 + 8.0 * noise(u * 0.02) + spire) as i64
+            }
+            Backdrop::Ruins => {
+                let slot = (u / 28.0).floor();
+                let local = u - slot * 28.0;
+                let standing = hash(slot as i64, 17) > 0.3;
+                if standing && local > 7.0 && local < 15.0 {
+                    let top = base + 8.0 + 34.0 * hash(slot as i64, 18);
+                    let capital = if local < 8.0 || local > 14.0 { -2.0 } else { 0.0 };
+                    let broken = if hash(slot as i64, 19) > 0.5 { 3.0 * hash(u as i64, 20) } else { 0.0 };
+                    (top + capital - broken) as i64
+                } else {
+                    (base - 14.0 + 5.0 * noise(u * 0.04)) as i64
+                }
+            }
+            Backdrop::Library => {
+                let slot = (u / 42.0).floor();
+                let local = u - slot * 42.0;
+                if local < 34.0 {
+                    let top = base + 12.0 + 24.0 * hash(slot as i64, 21);
+                    let finial = if local < 2.0 || local > 32.0 { 3.0 } else { 0.0 };
+                    (top + finial) as i64
+                } else {
+                    (base - 6.0) as i64
+                }
+            }
+            Backdrop::Islands => (base - 40.0 + 6.0 * noise(u * 0.02)) as i64,
         }
     }
 
@@ -139,12 +192,94 @@ impl SpellrunRenderer {
                 (base - 4.0 + (4.0 + 18.0 * hash(slot as i64, 9)) * (1.0 - (local - 5.0).abs() / 2.5).max(0.0)) as i64
             }
             Backdrop::Castle => (base + 4.0 + if (u as i64) % 8 < 4 { 3.0 } else { 0.0 }) as i64,
+            Backdrop::Mushrooms => {
+                let slot = (u / 13.0).floor();
+                let local = (u - slot * 13.0 - 6.5) / 6.5;
+                let cap = (6.0 + 9.0 * hash(slot as i64, 22)) * (1.0 - local * local).max(0.0).sqrt();
+                (base - 2.0 + cap) as i64
+            }
+            Backdrop::Volcano => (base + 6.0 * noise(u * 0.03) + 3.0 * hash((u / 2.0).floor() as i64, 23)) as i64,
+            Backdrop::Glacier => {
+                let slot = (u / 8.0).floor();
+                let local = u - slot * 8.0;
+                (base + (3.0 + 12.0 * hash(slot as i64, 24)) * (1.0 - (local - 4.0).abs() / 4.0)) as i64
+            }
+            Backdrop::Ruins => {
+                let slot = (u / 30.0).floor();
+                let local = u - slot * 30.0;
+                let stump = if hash(slot as i64, 25) > 0.5 && local > 10.0 && local < 16.0 { 6.0 + 12.0 * hash(slot as i64, 26) } else { 0.0 };
+                (base - 3.0 + 5.0 * noise(u * 0.05) + stump) as i64
+            }
+            Backdrop::Library => {
+                // Stacks of books: each a few pixels wide and a few tall.
+                let slot = (u / 5.0).floor();
+                (base + 1.0 + 7.0 * hash(slot as i64, 27) * noise(u * 0.02 + 3.0)) as i64
+            }
+            Backdrop::Islands => (base - 60.0) as i64,
         }
     }
 
-    fn draw_orb(&self, canvas: &mut PixelCanvas, color: u32, moon: bool) {
+    /// Scenery that overhangs (so a height map can't draw it): giant mushrooms, floating islands. Mid parallax.
+    fn prop(&self, b: &Biome, u: f64, x: i64, from_bottom: i64, time: f64, low: f32) -> Option<u32> {
+        let y = from_bottom as f64;
+        match b.backdrop {
+            Backdrop::Mushrooms => {
+                let slot = (u / 58.0).floor();
+                let s = slot as i64;
+                if hash(s, 41) < 0.35 {
+                    return None;
+                }
+                let center = slot * 58.0 + 16.0 + 26.0 * hash(s, 42);
+                let stalk = self.height as f64 * (0.36 + 0.26 * hash(s, 43));
+                let (dx, rx) = (u - center, 10.0 + 9.0 * hash(s, 44));
+                let ry = rx * 0.55;
+                let cy = y - stalk;
+                if cy >= -2.0 && (dx / rx).powi(2) + (cy / ry).powi(2) <= 1.0 {
+                    let spot = hash(((dx + 40.0) / 4.0).floor() as i64 + s * 13, ((cy + 20.0) / 3.0).floor() as i64) > 0.78;
+                    return Some(if cy < 0.5 {
+                        mix(b.platform_shade, b.far, 0.45)
+                    } else if spot {
+                        mix(mix(b.accent, b.far, 0.35), rgb(0xFFFFFF), 0.25 * low)
+                    } else if cy > ry * 0.55 && bayer(x, from_bottom) < 0.5 {
+                        mix(mix(b.platform, rgb(0xFFFFFF), 0.15), b.far, 0.4)
+                    } else {
+                        mix(b.platform, b.far, 0.4)
+                    });
+                }
+                let half_width = 1.5 + 1.5 * hash(s, 45) + (stalk - y).max(0.0) * 0.03;
+                (y < stalk && dx.abs() < half_width).then(|| mix(b.far, rgb(0xE8D8F0), if dx < 0.0 { 0.3 } else { 0.18 }))
+            }
+            Backdrop::Islands => {
+                let slot = (u / 64.0).floor();
+                let s = slot as i64;
+                if hash(s, 51) < 0.3 {
+                    return None;
+                }
+                let center = slot * 64.0 + 14.0 + 36.0 * hash(s, 52);
+                let half_width = 13.0 + 14.0 * hash(s, 53);
+                let top = self.height as f64 * (0.42 + 0.3 * hash(s, 54)) + (time * 0.6 + s as f64).sin() * 2.0;
+                let dx = (u - center).abs();
+                if dx < half_width && y <= top && y >= top - half_width * 0.9 * (1.0 - dx / half_width) - 1.0 {
+                    return Some(if y > top - 2.0 {
+                        mix(b.ground_top, b.far, 0.35)
+                    } else if bayer(x, from_bottom) < (dx / half_width) as f32 {
+                        mix(b.ground_dark, b.far, 0.3)
+                    } else {
+                        mix(b.ground_fill, b.far, 0.3)
+                    });
+                }
+                // A thin glowing crystal on some islands.
+                let crystal_x = center + half_width * (hash(s, 55) - 0.5);
+                (hash(s, 56) > 0.5 && (u - crystal_x).abs() < 1.0 && y > top && y < top + 5.0 + 4.0 * hash(s, 57))
+                    .then(|| mix(b.block_glow, rgb(0xFFFFFF), 0.3 * low))
+            }
+            _ => None,
+        }
+    }
+
+    fn draw_orb(&self, canvas: &mut PixelCanvas, color: u32, moon: bool, low: f32) {
         let (cx, cy, r) = (self.width * 4 / 5, 24, 9);
-        canvas.glow(cx, cy, r + 7, color, 0.12);
+        canvas.glow(cx, cy, r + 7 + (low * 5.0) as i64, color, 0.12 + 0.14 * low);
         for dy in -r..=r {
             for dx in -r..=r {
                 if dx * dx + dy * dy > r * r {
@@ -251,7 +386,10 @@ impl SpellrunRenderer {
         }
 
         let hero = &game.hero;
-        let sprite = if hero.pounding {
+        let casting = hero.cast_time > 0.0 && !hero.pounding;
+        let sprite = if casting {
+            &art.hero_cast[if hero.grounded { (hero.stride / 7.0) as i64 as usize & 1 } else { 1 }]
+        } else if hero.pounding {
             &art.hero_pound
         } else if !hero.grounded {
             &art.hero_jump
@@ -263,13 +401,16 @@ impl SpellrunRenderer {
         if visible {
             canvas.draw(sprite, hero_x, hero_y, false);
         }
-        // The staff gem glows with the highs.
-        canvas.glow(hero_x + 10, hero_y + 2, 3 + (high * 5.0) as i64, rgb(0x74FFAD), 0.2 + 0.6 * high);
+        // The staff gem glows with the highs, and flares while casting.
+        let (gem_x, gem_y) = if casting { (hero_x + 14, hero_y + 10) } else { (hero_x + 10, hero_y + 2) };
+        let flare = if casting { 0.5 } else { 0.0 };
+        canvas.glow(gem_x, gem_y, 3 + (high * 5.0) as i64 + if casting { 4 } else { 0 }, rgb(0x74FFAD), 0.2 + 0.6 * high + flare);
 
         for bolt in &game.bolts {
-            let (x, y) = (self.screen_x(bolt.x), self.screen_top(bolt.y, 2));
-            canvas.glow(x + 1, y + 1, 5, rgb(0x74FFAD), 0.6);
-            canvas.fill_rect(x, y, 3, 2, rgb(0xE6FFF0));
+            let size = if bolt.big { 3 } else { 2 };
+            let (x, y) = (self.screen_x(bolt.x), self.screen_top(bolt.y, size));
+            canvas.glow(x + 1, y + 1, if bolt.big { 8 } else { 5 }, bolt.color, 0.6);
+            canvas.fill_rect(x, y, 3, size, mix(bolt.color, rgb(0xFFFFFF), 0.75));
         }
 
         for particle in game.particles.iter().filter(|p| p.life > 0.0) {
@@ -277,6 +418,86 @@ impl SpellrunRenderer {
             let fade_out = (particle.life / particle.max_life) as f32;
             if fade_out > 0.5 || bayer(x, y) < fade_out * 2.0 {
                 canvas.fill_rect(x, y, particle.size, particle.size, particle.color);
+            }
+        }
+    }
+
+    // Weather
+
+    /// Ambient particles for the current biome. Positions come from a hash of each particle's index and the time,
+    /// so they need no state; they drift with their own parallax and react to the music.
+    fn draw_weather(&self, game: &SpellrunGame, canvas: &mut PixelCanvas, levels: BandLevels) {
+        let b = game.biome();
+        let count = match b.weather {
+            Weather::Clear => return,
+            Weather::Snow => 80,
+            Weather::Bubbles => 26,
+            Weather::Embers => 46,
+            Weather::Spores => 34,
+            Weather::Fireflies => 22,
+            Weather::Dust => 44,
+        };
+        let (w, h, t) = (self.width as f64 + 40.0, self.height as f64 + 20.0, game.time);
+        let wrap = |v: f64, span: f64| v.rem_euclid(span);
+        let fade = game.biome_fade as f32;
+        for i in 0..count {
+            let (r1, r2, r3) = (hash(i, 1), hash(i, 2), hash(i, 3));
+            // During a biome change the new weather dissolves in with the backdrop.
+            if bayer(i, 7) > fade {
+                continue;
+            }
+            let depth = 0.4 + 0.6 * r3;
+            let drift_x = r1 * w - self.camera_x as f64 * 0.6 * depth;
+            let color = b.weather_color;
+            match b.weather {
+                Weather::Snow => {
+                    let x = wrap(drift_x + (t * 0.8 + i as f64).sin() * 6.0 - t * 8.0 * depth, w) as i64 - 20;
+                    let y = wrap(r2 * h + t * (10.0 + 18.0 * depth) * (0.8 + 0.4 * levels.mid as f64), h) as i64 - 10;
+                    let size = if depth > 0.85 { 2 } else { 1 };
+                    canvas.fill_rect(x, y, size, size, mix(b.sky_bottom, color, 0.5 + 0.5 * depth as f32));
+                }
+                Weather::Embers => {
+                    let x = wrap(drift_x + (t * 2.0 + i as f64).sin() * 3.0, w) as i64 - 20;
+                    let y = self.height - wrap(r2 * h + t * (16.0 + 22.0 * depth), h) as i64 + 10;
+                    let flicker = 0.5 + 0.5 * (t * (6.0 + 5.0 * r1) + i as f64).sin() as f32;
+                    canvas.set(x, y, mix(rgb(0xB2301E), color, flicker));
+                    canvas.glow(x, y, 2, color, (0.1 + 0.35 * levels.low) * flicker);
+                }
+                Weather::Bubbles => {
+                    let x = wrap(drift_x + (t * 3.0 + i as f64).sin() * 2.0, w) as i64 - 20;
+                    let y = self.height - wrap(r2 * h + t * (12.0 + 16.0 * depth), h) as i64 + 10;
+                    let c = mix(b.sky_bottom, color, 0.35 + 0.4 * depth as f32);
+                    if depth > 0.7 {
+                        for (dx, dy) in [(1, 0), (0, 1), (2, 1), (1, 2)] {
+                            canvas.set(x + dx, y + dy, c);
+                        }
+                        canvas.set(x + 1, y, mix(c, rgb(0xFFFFFF), 0.5));
+                    } else {
+                        canvas.set(x, y, c);
+                    }
+                }
+                Weather::Spores => {
+                    let x = wrap(drift_x + (t * 0.7 + i as f64 * 1.7).sin() * 8.0, w) as i64 - 20;
+                    let y = self.height - wrap(r2 * h + t * (4.0 + 6.0 * depth), h) as i64 + 10;
+                    canvas.set(x, y, mix(b.sky_bottom, color, 0.7));
+                    canvas.glow(x, y, 3, color, 0.08 + 0.3 * levels.high);
+                }
+                Weather::Fireflies => {
+                    let x = wrap(drift_x + (t * 0.4 + r2 * 9.0).sin() * 18.0, w) as i64 - 20;
+                    let y = (self.height as f64 * (0.3 + 0.45 * r2) + (t * 0.7 + i as f64 * 1.3).sin() * 9.0) as i64;
+                    let blink = ((t * 0.9 + r1 * 10.0).sin() as f32 - 0.2).max(0.0) * (0.6 + 0.6 * levels.high);
+                    if blink > 0.05 {
+                        canvas.set(x, y, mix(b.near, color, blink.min(1.0)));
+                        canvas.glow(x, y, 4, color, 0.25 * blink);
+                    }
+                }
+                Weather::Dust => {
+                    let x = wrap(drift_x + t * 3.0 * depth, w) as i64 - 20;
+                    let y = (r2 * self.height as f64 + (t * 0.4 + i as f64).sin() * 6.0) as i64;
+                    let twinkle = 0.3 + 0.7 * ((t * 1.5 + r1 * 20.0).sin() as f32 * 0.5 + 0.5) * (0.4 + 0.6 * levels.high);
+                    canvas.set(x, y, mix(b.sky_bottom, color, twinkle));
+                }
+                Weather::Clear => {}
             }
         }
     }
@@ -438,3 +659,4 @@ mod tests {
         }
     }
 }
+

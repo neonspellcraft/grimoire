@@ -18,7 +18,7 @@ Main window
 Keyboard shortcuts (on by default; can be turned off in settings)
   Space play/pause, Left/Right seek 5 s (Shift: 30 s), Up/Down select, Enter play, Delete removes,
   type anywhere to search, Ctrl+Left/Right previous/next, Ctrl+O open files, Ctrl+V visualizer window.
-  Visualizer window: 1-7 or Tab switch scenes, R reseed, M band meters, F full screen.
+  Visualizer window: 1-8 or Tab switch scenes, R reseed, M band meters, F full screen.
 
 Wizard
   A looping animation of a wizard reading a glowing grimoire. It doesn't follow the music.

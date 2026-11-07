@@ -4,10 +4,13 @@
 //! input, renders a low-resolution frame on the CPU, and has the GPU scale it up by a whole number so every
 //! game pixel stays perfectly sharp.
 //!
-//! - LOW: kicks make the apprentice hop when the ground ahead is safe; big kicks mid-air become ground pounds;
-//!   beat lanterns and rune blocks glow with the bass.
+//! - LOW: the apprentice learns the tempo from the kicks and hops on the beat, each hop lasting exactly one beat
+//!   so he lands on the next kick; big kicks mid-air become ground pounds; lanterns, rune blocks and the sun or
+//!   moon glow with the bass.
 //! - MID: run speed and how lively the generated terrain is (gaps, hills, platforms, blocks).
-//! - HIGH: spell bolts, motes dropping out of the air, twinkling stars and the staff gem's glow.
+//! - HIGH: every hi-hat transient casts a spell that seeks the nearest enemy (quick runs fan out three bolts);
+//!   motes drop out of the air, stars twinkle, and fireflies, spores and dust glow.
+//! - A drop (loud after quiet): a nova of bolts in every direction and, soon after, a new world.
 
 use grimoire_core::spellrun::{PixelCanvas, SpellrunGame, SpellrunInput, SpellrunRenderer};
 

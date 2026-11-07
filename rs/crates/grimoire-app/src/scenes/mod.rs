@@ -1,6 +1,7 @@
 //! Full-window GPU visualizer scenes (port of `Sources/Grimoire/UI/SceneWindow`).
 
 mod animation;
+mod blackhole;
 mod clouds;
 mod doom;
 mod splatter;
@@ -11,6 +12,7 @@ mod viewscreen;
 use grimoire_core::BandLevels;
 
 pub use animation::AnimationScene;
+pub use blackhole::BlackHoleScene;
 pub use clouds::CloudsScene;
 pub use doom::DoomScene;
 pub use spellrun::SpellrunScene;
@@ -72,19 +74,22 @@ pub enum SceneKind {
     Wizard,
     /// A dim night sky with clouds drifting past the moon; gently music-driven.
     Clouds,
+    /// An endless psychedelic fall into a black hole, with real gravitational lensing.
+    BlackHole,
     /// A game rather than a visualizer: Freedoom on the Doom engine, played with the keyboard or a controller.
     Doom,
 }
 
 impl SceneKind {
     /// In menu order. Doom always stays last.
-    pub const ALL: [SceneKind; 7] = [
+    pub const ALL: [SceneKind; 8] = [
         SceneKind::ThreeBody,
         SceneKind::Viewscreen,
         SceneKind::Spellrun,
         SceneKind::Splatter,
         SceneKind::Wizard,
         SceneKind::Clouds,
+        SceneKind::BlackHole,
         SceneKind::Doom,
     ];
 
@@ -102,6 +107,7 @@ impl SceneKind {
             SceneKind::Splatter => "splatter",
             SceneKind::Wizard => "wizard",
             SceneKind::Clouds => "clouds",
+            SceneKind::BlackHole => "blackHole",
             SceneKind::Doom => "doom",
         }
     }
@@ -118,6 +124,7 @@ impl SceneKind {
             SceneKind::Splatter => "Splatter",
             SceneKind::Wizard => "Wizard",
             SceneKind::Clouds => "Night Clouds",
+            SceneKind::BlackHole => "Black Hole",
             SceneKind::Doom => "Doom",
         }
     }
@@ -131,6 +138,7 @@ impl SceneKind {
             SceneKind::Splatter => "Fresh Canvas",
             SceneKind::Wizard => "From the Top",
             SceneKind::Clouds => "New Sky",
+            SceneKind::BlackHole => "New Black Hole",
             SceneKind::Doom => "",
         }
     }
@@ -143,6 +151,7 @@ impl SceneKind {
             SceneKind::Spellrun => Ok(Box::new(SpellrunScene::new(device, format))),
             SceneKind::Wizard => Ok(Box::new(AnimationScene::new(device, format, &animation::wizard_file()?)?)),
             SceneKind::Clouds => Ok(Box::new(CloudsScene::new(device, format))),
+            SceneKind::BlackHole => Ok(Box::new(BlackHoleScene::new(device, format))),
             SceneKind::Doom => Ok(Box::new(DoomScene::new(device, format)?)),
         }
     }
