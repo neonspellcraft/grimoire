@@ -1,0 +1,20 @@
+[package]
+name = "grimoire-app"
+description = "Grimoire for Mac and Windows: player plus GPU visualizer scenes (wgpu)."
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "grimoire"
+path = "src/main.rs"
+
+[dependencies]
+grimoire-core.workspace = true
+grimoire-audio.workspace = true
+glam.workspace = true
+bytemuck = { version = "1", features = ["derive"] }
+fastrand = "2"
+image = { version = "0.25", default-features = false, features = ["png"] }
+pollster = "0.4"
+wgpu = "25"
+winit = "0.30"

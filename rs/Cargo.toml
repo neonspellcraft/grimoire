@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["crates/grimoire-core", "crates/grimoire-audio", "crates/grimoire-app"]
+
+[workspace.package]
+version = "0.7.0"
+edition = "2021"
+
+[workspace.dependencies]
+grimoire-core = { path = "crates/grimoire-core" }
+grimoire-audio = { path = "crates/grimoire-audio" }
+glam = "0.30"
+
+[profile.release]
+lto = "thin"

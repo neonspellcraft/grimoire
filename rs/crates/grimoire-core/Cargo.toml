@@ -1,0 +1,11 @@
+[package]
+name = "grimoire-core"
+description = "Pure Grimoire logic: playlist, m3u, tags, analysis, physics. No OS or GPU dependencies."
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+glam.workspace = true
+fastrand = "2"
+realfft = "3"
+url = "2"

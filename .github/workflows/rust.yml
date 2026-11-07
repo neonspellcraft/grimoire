@@ -1,0 +1,46 @@
+name: Rust (macOS + Windows)
+
+on:
+  push:
+    paths: ["rs/**", ".github/workflows/rust.yml"]
+  pull_request:
+    paths: ["rs/**", ".github/workflows/rust.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: rs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rs
+
+      # Includes an offscreen render of the Three-Body scene (WARP on Windows runners, which have no GPU).
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Upload Windows build
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: grimoire-windows-x64
+          path: rs/target/release/grimoire.exe
+
+      - name: Upload macOS build
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: grimoire-macos-arm64
+          path: rs/target/release/grimoire
