@@ -21,10 +21,11 @@ use crate::settings::Settings;
 use crate::vis_window::VisWindow;
 
 pub const HELP: &str = "\
-Type to search the playlist; Enter plays the match. Space play/pause, ←/→ seek (Shift: 30 s),
-↑/↓ select, Delete removes, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open, ⌘/Ctrl+V visualizer, ⌘/Ctrl+Q quit.
-Visualizer window: 1–4 or Tab switch scenes, R reseed, M band meters, F or double-click full screen.
-Drop audio files, folders or .m3u playlists on either window.";
+Click the prompt to search the playlist; Enter plays the match. ⌘/Ctrl+Q quits. Drop audio files, folders
+or .m3u playlists on either window. Keyboard shortcuts are off by default; turn them on in settings (⚙):
+Space play/pause, ←/→ seek (Shift: 30 s), ↑/↓ select, Delete removes, type anywhere to search,
+⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open, ⌘/Ctrl+V visualizer;
+visualizer window: 1–4 or Tab switch scenes, R reseed, M band meters, F full screen.";
 
 pub fn run(paths: Vec<PathBuf>) -> Result<(), String> {
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
@@ -49,7 +50,14 @@ struct Running {
     feed: AudioFeed,
     settings: Settings,
     last_save: Instant,
+    next_main_frame: Instant,
+    next_vis_frame: Instant,
 }
+
+/// Frame interval while something is moving (scenes, playback, typing). 60 fps, as in the Swift app.
+const FRAME: Duration = Duration::from_micros(16_667);
+/// Idle main window: fast enough for the blinking clock and cursor.
+const IDLE_FRAME: Duration = Duration::from_millis(125);
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -72,19 +80,52 @@ impl ApplicationHandler for App {
                     app.main.draw(&app.gpu, &app.library, &app.feed);
                     None
                 }
-                other => app.main.event(other, &app.gpu, &mut app.library),
+                other => {
+                    // Input shows its effect right away instead of waiting for the next scheduled frame.
+                    app.main.window().request_redraw();
+                    app.main.event(other, &app.gpu, &mut app.library)
+                }
             };
             match request {
                 Some(Request::Quit) => event_loop.exit(),
                 Some(Request::ToggleVisualizer) => app.toggle_visualizer(event_loop),
+                Some(Request::SetShortcuts(on)) => {
+                    app.settings.keyboard_shortcuts = on;
+                    app.main.shortcuts = on;
+                    if let Some(vis) = &mut app.vis {
+                        vis.shortcuts = on;
+                    }
+                    app.library.dirty = true;
+                }
+                Some(Request::SetScene(kind)) => {
+                    app.settings.scene = kind.raw().into();
+                    if let Some(vis) = &mut app.vis {
+                        vis.select(&app.gpu, kind);
+                    }
+                    app.library.dirty = true;
+                }
+                Some(Request::SetMeters(on)) => {
+                    app.settings.show_meters = on;
+                    if let Some(vis) = &mut app.vis {
+                        vis.show_meters = on;
+                    }
+                    app.library.dirty = true;
+                }
+                Some(Request::Reseed) => {
+                    if let Some(vis) = &mut app.vis {
+                        vis.reseed();
+                    }
+                }
                 None => {}
             }
+            app.sync_visualizer_state();
         } else if let Some(vis) = app.vis.as_mut().filter(|v| v.surface.window.id() == id) {
             if matches!(event, WindowEvent::RedrawRequested) {
                 vis.draw(&app.gpu, &app.feed);
             } else if vis.event(&event, &app.gpu, &mut app.library).is_some() {
                 app.close_visualizer();
             }
+            app.sync_visualizer_state();
         }
     }
 
@@ -98,20 +139,26 @@ impl ApplicationHandler for App {
         if app.library.dirty && app.last_save.elapsed() > Duration::from_secs(5) {
             app.save();
         }
-        let main_visible = app.main.surface.is_drawable() && !app.main.window().is_minimized().unwrap_or(false);
-        let vis_visible = app.vis.as_ref().is_some_and(|v| v.surface.is_drawable() && !v.occluded);
-        if main_visible {
-            app.main.window().request_redraw();
+        // Draw on a schedule instead of as fast as possible: 60 fps for anything moving, a slow tick for the
+        // blinking clock and cursor when the main window is idle, nothing for hidden windows. Input redraws at once.
+        let now = Instant::now();
+        let mut wake = now + Duration::from_millis(250);
+        if app.main.is_visible() {
+            if now >= app.next_main_frame {
+                app.main.window().request_redraw();
+                let interval = if app.main.is_animating(&app.library, &app.feed) { FRAME } else { IDLE_FRAME };
+                app.next_main_frame = now + interval;
+            }
+            wake = wake.min(app.next_main_frame);
         }
-        if let Some(vis) = app.vis.as_ref().filter(|_| vis_visible) {
-            vis.surface.window.request_redraw();
+        if let Some(vis) = app.vis.as_ref().filter(|v| v.surface.is_drawable() && !v.occluded) {
+            if now >= app.next_vis_frame {
+                vis.surface.window.request_redraw();
+                app.next_vis_frame = now + FRAME;
+            }
+            wake = wake.min(app.next_vis_frame);
         }
-        // Vsync paces drawing; with nothing on screen, just keep the playlist moving.
-        event_loop.set_control_flow(if main_visible || vis_visible {
-            ControlFlow::Poll
-        } else {
-            ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(100))
-        });
+        event_loop.set_control_flow(ControlFlow::WaitUntil(wake));
     }
 
     fn exiting(&mut self, _: &ActiveEventLoop) {
@@ -135,6 +182,7 @@ impl Running {
         let gpu = gpu.expect("the first window creates the device");
         let mut main = MainWindow::new(surface, &gpu);
         main.show_remaining = settings.show_remaining;
+        main.shortcuts = settings.keyboard_shortcuts;
 
         let mut library = Library::new();
         if paths.is_empty() {
@@ -154,11 +202,28 @@ impl Running {
             feed: AudioFeed::default(),
             settings,
             last_save: Instant::now(),
+            next_main_frame: Instant::now(),
+            next_vis_frame: Instant::now(),
         };
         if running.settings.visualizer_open {
             running.open_visualizer(event_loop);
         }
+        running.sync_visualizer_state();
         Ok(running)
+    }
+
+    /// Keeps the settings panel's view of the visualizer (scene, meters) current, wherever it was changed from.
+    fn sync_visualizer_state(&mut self) {
+        match &self.vis {
+            Some(vis) => {
+                self.main.scene = vis.kind;
+                self.main.show_meters = vis.show_meters;
+            }
+            None => {
+                self.main.scene = SceneKind::from_raw(&self.settings.scene).unwrap_or(SceneKind::ThreeBody);
+                self.main.show_meters = self.settings.show_meters;
+            }
+        }
     }
 
     fn toggle_visualizer(&mut self, event_loop: &ActiveEventLoop) {
@@ -187,7 +252,8 @@ impl Running {
                 VisWindow::new(surface, &self.gpu, kind, self.settings.show_meters)
             });
         match opened {
-            Ok(vis) => {
+            Ok(mut vis) => {
+                vis.shortcuts = self.settings.keyboard_shortcuts;
                 self.vis = Some(vis);
                 self.main.visualizer_open = true;
             }

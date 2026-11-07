@@ -40,6 +40,22 @@ pub enum Action {
     /// A playlist row, by index into `View::rows`.
     Row(usize),
     List,
+    /// Opens or closes the settings panel (it takes the playlist's place).
+    Settings,
+    ToggleShortcuts,
+    PreviousScene,
+    NextScene,
+    ToggleMeters,
+    Reseed,
+}
+
+/// What the settings panel shows.
+#[derive(Clone, Debug, Default)]
+pub struct SettingsView {
+    pub shortcuts: bool,
+    pub scene: String,
+    pub meters: bool,
+    pub visualizer_open: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -78,6 +94,8 @@ pub struct View {
     pub total_duration: f64,
     /// 0 just after a track change, rising to 1 when the glitch reveal has settled.
     pub reveal: f32,
+    /// Some while the settings panel is open.
+    pub settings: Option<SettingsView>,
 }
 
 /// How many playlist rows fit at this height (everything except the chrome around the list).
@@ -194,6 +212,7 @@ pub fn layout(view: &View, screen: &mut Screen<Action>) {
         ("⇄".into(), view.shuffle, Action::Shuffle),
         (match view.repeat { RepeatMode::One => "⟲1", _ => "⟲" }.into(), view.repeat != RepeatMode::Off, Action::Repeat),
         ("◈".into(), view.visualizer, Action::Visualizer),
+        ("⚙".into(), view.settings.is_some(), Action::Settings),
         ("+".into(), false, Action::Open),
     ];
     let mut end = w - 2;
@@ -216,6 +235,11 @@ pub fn layout(view: &View, screen: &mut Screen<Action>) {
 
     let first = 7;
     let visible = list_rows(h);
+    if let Some(settings) = &view.settings {
+        screen.text(2, 6, " settings ", VIOLET, 10);
+        draw_settings(settings, screen, first, visible as u16);
+        return;
+    }
     screen.hit(CellRect { x: 1, y: first, w: inner, h: visible as u16 }, Action::List);
     for (i, track) in view.rows.iter().take(visible).enumerate() {
         let row = first + i as u16;
@@ -237,6 +261,49 @@ pub fn layout(view: &View, screen: &mut Screen<Action>) {
     if view.rows.is_empty() && visible > 0 {
         let hint = if view.prompt.is_empty() { "drop audio here, or + to summon files" } else { "no spell answers" };
         screen.text(4, first, hint, GREEN_FAINT, inner.saturating_sub(4));
+    }
+}
+
+fn draw_settings(settings: &SettingsView, screen: &mut Screen<Action>, first: u16, rows: u16) {
+    let inner = screen.cols - 2;
+    let value_col = 26.min(inner.saturating_sub(14));
+    let mut row = first;
+    let mut line = |screen: &mut Screen<Action>, label: &str, value: &str, on: bool, action: Action| {
+        if row >= first + rows {
+            return;
+        }
+        screen.text(4, row, label, GREEN_DIM, value_col.saturating_sub(5));
+        let text = format!("‹ {value} ›");
+        let n = screen.text(value_col, row, &text, if on { GREEN } else { VIOLET_DIM }, inner.saturating_sub(value_col));
+        screen.hit(CellRect { x: 1, y: row, w: inner, h: 1 }, action);
+        // On the scene row, the arrows step backward and forward.
+        if action == Action::NextScene {
+            screen.hit(CellRect { x: value_col.saturating_sub(1), y: row, w: 3, h: 1 }, Action::PreviousScene);
+            screen.hit(CellRect { x: value_col + n.saturating_sub(2), y: row, w: 3, h: 1 }, Action::NextScene);
+        }
+        row += 1;
+    };
+    line(screen, "keyboard shortcuts", if settings.shortcuts { "on" } else { "off" }, settings.shortcuts, Action::ToggleShortcuts);
+    line(screen, "visualizer scene", &settings.scene.to_lowercase(), true, Action::NextScene);
+    line(screen, "band meters", if settings.meters { "on" } else { "off" }, settings.meters, Action::ToggleMeters);
+    let reseed = if settings.visualizer_open { "cast" } else { "open ◈ first" };
+    line(screen, "reseed the scene", reseed, settings.visualizer_open, Action::Reseed);
+
+    let help: &[&str] = if settings.shortcuts {
+        &[
+            "space play/pause · ←/→ seek (shift 30 s) · ↑/↓ select",
+            "enter play · delete remove · type to search",
+            "⌘/ctrl ←/→ prev/next · o open · v visualizer",
+            "visualizer: 1–4 or tab scenes · r reseed · m meters · f full",
+        ]
+    } else {
+        &["shortcuts are off: click the prompt to search", "⌘/ctrl+q quits · esc leaves full screen"]
+    };
+    for (i, text) in help.iter().enumerate() {
+        let y = row + 1 + i as u16;
+        if y < first + rows {
+            screen.text_ellipsized(4, y, text, GREEN_FAINT, inner.saturating_sub(4));
+        }
     }
 }
 
@@ -377,6 +444,7 @@ pub fn sample_view() -> View {
         track_count: titles.len(),
         total_duration: titles.iter().map(|t| t.1).sum(),
         reveal: 1.0,
+        settings: None,
     }
 }
 
@@ -425,6 +493,25 @@ mod tests {
         empty.rows.clear();
         empty.track_count = 0;
         assert!(render(&empty, 48, 12).row_text(7).contains("drop audio here"));
+    }
+
+    #[test]
+    fn settings_panel_replaces_the_playlist() {
+        let mut view = sample_view();
+        view.settings = Some(SettingsView { shortcuts: false, scene: "Three-Body".into(), meters: true, visualizer_open: true });
+        let screen = render(&view, 48, 16);
+        assert!(screen.row_text(6).contains(" settings "));
+        assert!(screen.row_text(7).contains("keyboard shortcuts") && screen.row_text(7).contains("‹ off ›"));
+        assert!(screen.row_text(8).contains("‹ three-body ›"));
+        assert!(!screen.row_text(7).contains("moonrise"));
+        assert_eq!(screen.hit_test(10, 7).map(|h| h.action), Some(Action::ToggleShortcuts));
+        let row = screen.row_text(8);
+        let open = row.chars().position(|c| c == '‹').unwrap() as u16;
+        let close = row.chars().position(|c| c == '›').unwrap() as u16;
+        assert_eq!(screen.hit_test(open, 8).map(|h| h.action), Some(Action::PreviousScene));
+        assert_eq!(screen.hit_test(close, 8).map(|h| h.action), Some(Action::NextScene));
+        let gear = screen.row_text(5).chars().position(|c| c == '⚙').unwrap() as u16;
+        assert_eq!(screen.hit_test(gear, 5).map(|h| h.action), Some(Action::Settings));
     }
 
     #[test]

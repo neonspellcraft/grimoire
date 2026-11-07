@@ -25,6 +25,8 @@ pub struct Settings {
     pub visualizer_position: Option<(i32, i32)>,
     pub scene: String,
     pub show_meters: bool,
+    /// Keyboard shortcuts beyond quitting and editing the prompt. Off unless turned on in settings.
+    pub keyboard_shortcuts: bool,
 }
 
 impl Default for Settings {
@@ -44,6 +46,7 @@ impl Default for Settings {
             visualizer_position: None,
             scene: "threeBody".into(),
             show_meters: false,
+            keyboard_shortcuts: false,
         }
     }
 }
@@ -108,5 +111,6 @@ mod tests {
         let old: Settings = serde_json::from_str(r#"{"volume": 0.5}"#).unwrap();
         assert_eq!(old.volume, 0.5);
         assert_eq!(old.scene, "threeBody");
+        assert!(!old.keyboard_shortcuts, "shortcuts start off");
     }
 }

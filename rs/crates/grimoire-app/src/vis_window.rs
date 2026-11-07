@@ -21,6 +21,8 @@ pub struct VisWindow {
     last_frame: Option<Instant>,
     last_click: Option<Instant>,
     pub occluded: bool,
+    /// Off by default; then only the mouse (double-click for full screen) and Esc work here.
+    pub shortcuts: bool,
 }
 
 /// Whether the visualizer window wants to close.
@@ -34,11 +36,11 @@ impl VisWindow {
             Err(_) => (SceneKind::ThreeBody, SceneKind::ThreeBody.make(&gpu.device, surface.view_format)?),
         };
         surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
-        Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false })
+        Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false, shortcuts: false })
     }
 
     /// Swaps in a fresh instance of `kind`; the old scene and its GPU resources are released.
-    fn select(&mut self, gpu: &Gpu, kind: SceneKind) {
+    pub fn select(&mut self, gpu: &Gpu, kind: SceneKind) {
         if kind == self.kind {
             return;
         }
@@ -94,6 +96,12 @@ impl VisWindow {
         if event.state != ElementState::Pressed {
             return;
         }
+        if !self.shortcuts {
+            if event.logical_key == Key::Named(NamedKey::Escape) && self.surface.window.fullscreen().is_some() {
+                self.surface.window.set_fullscreen(None);
+            }
+            return;
+        }
         match &event.logical_key {
             Key::Named(NamedKey::Space) => library.toggle(),
             Key::Named(NamedKey::Tab) => {
@@ -115,6 +123,10 @@ impl VisWindow {
             },
             _ => {}
         }
+    }
+
+    pub fn reseed(&mut self) {
+        self.scene.reseed();
     }
 
     fn toggle_fullscreen(&self) {

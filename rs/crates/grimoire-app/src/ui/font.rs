@@ -206,7 +206,7 @@ mod tests {
             let fonts = Fonts::new(scale);
             assert!(fonts.cell_w > 4 && fonts.cell_h > 8, "cell {}x{}", fonts.cell_w, fonts.cell_h);
             let mut atlas = Atlas::new(1024);
-            let missing: Vec<char> = "GRIMOIRE moonrise 0123456789:/‹›▮▯◁▷▶❚✦⛧◆ᚠᚱᛉᛟ…·⟲⇄◈–×+-"
+            let missing: Vec<char> = "GRIMOIRE moonrise 0123456789:/‹›▮▯◁▷▶❚✦⛧◆ᚠᚱᛉᛟ…·⟲⇄◈⚙←→↑↓⌘–×+-"
                 .chars()
                 .filter(|&c| c != ' ' && procedural(c, 8.0, 16.0, 1.0).is_none() && atlas.glyph(&fonts, c).is_none())
                 .collect();

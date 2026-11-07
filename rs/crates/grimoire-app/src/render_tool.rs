@@ -174,7 +174,7 @@ pub fn render(
     Ok(frame)
 }
 
-/// `--render-ui out.png [--size 520x420] [--scale 2] [--reveal 1]`:
+/// `--render-ui out.png [--size 520x420] [--scale 2] [--reveal 1] [--settings]`:
 /// draws the main window with sample data, for reviewing the look without a running player.
 pub fn render_ui_from_args(args: &[String]) -> Option<Result<(), String>> {
     let flag = args.iter().position(|a| a == "--render-ui")?;
@@ -186,6 +186,14 @@ pub fn render_ui_from_args(args: &[String]) -> Option<Result<(), String>> {
         let mut view = layout::sample_view();
         if let Some(reveal) = value("--reveal").and_then(|s| s.parse().ok()) {
             view.reveal = reveal;
+        }
+        if args.iter().any(|a| a == "--settings") {
+            view.settings = Some(crate::ui::SettingsView {
+                shortcuts: false,
+                scene: "Three-Body".into(),
+                meters: false,
+                visualizer_open: true,
+            });
         }
         let width = (size.first().copied().unwrap_or(520) as f32 * scale) as u32;
         let height = (size.get(1).copied().unwrap_or(420) as f32 * scale) as u32;

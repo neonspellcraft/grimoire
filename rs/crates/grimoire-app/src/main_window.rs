@@ -15,15 +15,20 @@ use winit::window::{CursorIcon, ResizeDirection, Window};
 use crate::feed::AudioFeed;
 use crate::gpu::{Gpu, WindowSurface};
 use crate::library::{format_line, matches, Library};
+use crate::scenes::SceneKind;
 use crate::ui::layout::{self, list_rows, MIN_COLS, MIN_ROWS};
 use crate::ui::screen::CellRect;
-use crate::ui::{Action, Effects, RowView, Screen, UiRenderer, View};
+use crate::ui::{Action, Effects, RowView, Screen, SettingsView, UiRenderer, View};
 
 /// What the main window asks of the app.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Request {
     Quit,
     ToggleVisualizer,
+    SetShortcuts(bool),
+    SetScene(SceneKind),
+    SetMeters(bool),
+    Reseed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -60,6 +65,13 @@ pub struct MainWindow {
     revealing: Option<TrackId>,
     reveal_start: Instant,
     pub visualizer_open: bool,
+    occluded: bool,
+    /// Off by default: then only the mouse, the focused prompt, ⌘/Ctrl+Q and Esc (to leave full screen) act.
+    pub shortcuts: bool,
+    settings_open: bool,
+    /// Mirrors of the visualizer's state, for the settings panel.
+    pub scene: SceneKind,
+    pub show_meters: bool,
 }
 
 impl MainWindow {
@@ -87,9 +99,29 @@ impl MainWindow {
             revealing: None,
             reveal_start: Instant::now(),
             visualizer_open: false,
+            occluded: false,
+            shortcuts: false,
+            settings_open: false,
+            scene: SceneKind::ThreeBody,
+            show_meters: false,
         };
         window.apply_min_size();
         window
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.surface.is_drawable() && !self.occluded && !self.surface.window.is_minimized().unwrap_or(false)
+    }
+
+    /// Whether the next frames would look different without any input: playing music, the glitch reveal,
+    /// a drag, the prompt's cursor, or the spectrum and glow still settling after a pause.
+    pub fn is_animating(&self, library: &Library, feed: &AudioFeed) -> bool {
+        library.state() == PlayState::Playing
+            || self.reveal_start.elapsed().as_secs_f32() < 0.5
+            || self.drag.is_some()
+            || self.prompt_focused
+            || !feed.bars.is_settled()
+            || feed.follower.envelope.loudest() > 0.01
     }
 
     pub fn window(&self) -> &Arc<Window> {
@@ -202,6 +234,12 @@ impl MainWindow {
             track_count: library.playlist.tracks().len(),
             total_duration: library.playlist.total_duration(),
             reveal,
+            settings: self.settings_open.then(|| SettingsView {
+                shortcuts: self.shortcuts,
+                scene: self.scene.title().into(),
+                meters: self.show_meters,
+                visualizer_open: self.visualizer_open,
+            }),
         }
     }
 
@@ -215,6 +253,7 @@ impl MainWindow {
                 self.apply_min_size();
             }
             WindowEvent::ModifiersChanged(modifiers) => self.modifiers = modifiers.state(),
+            WindowEvent::Occluded(occluded) => self.occluded = *occluded,
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor = *position;
                 self.pointer_moved(library);
@@ -336,6 +375,16 @@ impl MainWindow {
                 }
             }
             Action::List => self.selected = None,
+            Action::Settings => self.settings_open = !self.settings_open,
+            Action::ToggleShortcuts => return Some(Request::SetShortcuts(!self.shortcuts)),
+            Action::PreviousScene | Action::NextScene => {
+                let all = SceneKind::ALL;
+                let index = all.iter().position(|&k| k == self.scene).unwrap_or(0);
+                let step = if action == Action::NextScene { 1 } else { all.len() - 1 };
+                return Some(Request::SetScene(all[(index + step) % all.len()]));
+            }
+            Action::ToggleMeters => return Some(Request::SetMeters(!self.show_meters)),
+            Action::Reseed => return Some(Request::Reseed),
         }
         None
     }
@@ -388,7 +437,8 @@ impl MainWindow {
         }
     }
 
-    /// Typing goes to the prompt (type-to-invoke). Keys that aren't text drive the player.
+    /// Keys. With shortcuts off (the default) only a few always work: ⌘/Ctrl+Q, and editing the prompt once it's
+    /// been clicked. With them on, typing anywhere searches and the player keys below apply.
     fn key(&mut self, event: &KeyEvent, library: &mut Library) -> Option<Request> {
         if event.state != ElementState::Pressed {
             return None;
@@ -397,6 +447,7 @@ impl MainWindow {
         if command {
             match &event.logical_key {
                 Key::Character(c) if c.eq_ignore_ascii_case("q") => return Some(Request::Quit),
+                _ if !self.shortcuts => {}
                 Key::Character(c) if c.eq_ignore_ascii_case("o") => self.open_dialog(library),
                 Key::Character(c) if c.eq_ignore_ascii_case("v") => return Some(Request::ToggleVisualizer),
                 Key::Named(NamedKey::ArrowRight) => library.next(),
@@ -405,25 +456,17 @@ impl MainWindow {
             }
             return None;
         }
+        if self.prompt_focused {
+            self.prompt_key(event, library);
+            return None;
+        }
+        if !self.shortcuts {
+            return None;
+        }
         let big = self.modifiers.shift_key();
         match &event.logical_key {
-            Key::Named(NamedKey::Escape) => {
-                self.prompt.clear();
-                self.prompt_focused = false;
-            }
-            Key::Named(NamedKey::Enter) => {
-                let target = self.selected.filter(|id| self.visible.contains(id)).or(self.visible.first().copied());
-                if let Some(id) = target {
-                    library.play(id);
-                    self.selected = Some(id);
-                }
-                self.prompt.clear();
-                self.prompt_focused = false;
-            }
-            Key::Named(NamedKey::Backspace) if self.prompt_focused || !self.prompt.is_empty() => {
-                self.prompt.pop();
-                self.scroll = 0;
-            }
+            Key::Named(NamedKey::Escape) => self.prompt.clear(),
+            Key::Named(NamedKey::Enter) => self.play_selection(library),
             Key::Named(NamedKey::Backspace | NamedKey::Delete) => {
                 if let Some(id) = self.selected.take() {
                     library.remove(&HashSet::from([id]));
@@ -433,8 +476,9 @@ impl MainWindow {
             Key::Named(NamedKey::ArrowUp) => self.move_selection(-1),
             Key::Named(NamedKey::ArrowRight) => library.seek(library.elapsed() + if big { 30.0 } else { 5.0 }),
             Key::Named(NamedKey::ArrowLeft) => library.seek((library.elapsed() - if big { 30.0 } else { 5.0 }).max(0.0)),
-            Key::Named(NamedKey::Space) if !self.prompt_focused => library.toggle(),
+            Key::Named(NamedKey::Space) => library.toggle(),
             _ => {
+                // Type-to-search: the first letter focuses the prompt.
                 if let Some(text) = event.text.as_ref().filter(|t| t.chars().all(|c| !c.is_control())) {
                     self.prompt.push_str(text);
                     self.prompt_focused = true;
@@ -444,6 +488,43 @@ impl MainWindow {
             }
         }
         None
+    }
+
+    /// Editing the focused prompt: text, Backspace, Esc to leave, Enter to play, ↑/↓ through the matches.
+    fn prompt_key(&mut self, event: &KeyEvent, library: &mut Library) {
+        match &event.logical_key {
+            Key::Named(NamedKey::Escape) => {
+                self.prompt.clear();
+                self.prompt_focused = false;
+            }
+            Key::Named(NamedKey::Enter) => {
+                self.play_selection(library);
+                self.prompt.clear();
+                self.prompt_focused = false;
+            }
+            Key::Named(NamedKey::Backspace) => {
+                self.prompt.pop();
+                self.scroll = 0;
+            }
+            Key::Named(NamedKey::ArrowDown) => self.move_selection(1),
+            Key::Named(NamedKey::ArrowUp) => self.move_selection(-1),
+            _ => {
+                if let Some(text) = event.text.as_ref().filter(|t| t.chars().all(|c| !c.is_control())) {
+                    self.prompt.push_str(text);
+                    self.scroll = 0;
+                    self.selected = None;
+                }
+            }
+        }
+    }
+
+    /// Plays the selected row if it's on screen, otherwise the first match.
+    fn play_selection(&mut self, library: &mut Library) {
+        let target = self.selected.filter(|id| self.visible.contains(id)).or(self.visible.first().copied());
+        if let Some(id) = target {
+            library.play(id);
+            self.selected = Some(id);
+        }
     }
 
     /// Moves the selection through the filtered list, scrolling to keep it on screen.

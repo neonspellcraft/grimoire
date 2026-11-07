@@ -6,6 +6,6 @@ pub mod render;
 pub mod screen;
 pub mod theme;
 
-pub use layout::{layout, Action, RowView, View};
+pub use layout::{layout, Action, RowView, SettingsView, View};
 pub use render::{Effects, UiRenderer};
 pub use screen::Screen;
