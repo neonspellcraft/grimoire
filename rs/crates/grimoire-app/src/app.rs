@@ -15,6 +15,7 @@ use crate::feed::AudioFeed;
 use crate::gpu::{Gpu, WindowSurface};
 use crate::library::Library;
 use crate::main_window::{MainWindow, Request};
+use crate::media::NowPlaying;
 use crate::scenes::SceneKind;
 use crate::settings::Settings;
 use crate::vis_window::VisWindow;
@@ -22,6 +23,7 @@ use crate::vis_window::VisWindow;
 pub const HELP: &str = "\
 Type to search the playlist; Enter plays the match. Space play/pause, ←/→ seek (Shift: 30 s),
 ↑/↓ select, Delete removes, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open, ⌘/Ctrl+V visualizer, ⌘/Ctrl+Q quit.
+Visualizer window: 1–4 or Tab switch scenes, R reseed, M band meters, F or double-click full screen.
 Drop audio files, folders or .m3u playlists on either window.";
 
 pub fn run(paths: Vec<PathBuf>) -> Result<(), String> {
@@ -43,6 +45,7 @@ struct Running {
     main: MainWindow,
     vis: Option<VisWindow>,
     library: Library,
+    now_playing: Option<NowPlaying>,
     feed: AudioFeed,
     settings: Settings,
     last_save: Instant,
@@ -88,6 +91,9 @@ impl ApplicationHandler for App {
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let Some(app) = &mut self.running else { return };
         app.library.tick();
+        if let Some(now_playing) = &mut app.now_playing {
+            now_playing.tick(&mut app.library);
+        }
         app.feed.update(&app.library);
         if app.library.dirty && app.last_save.elapsed() > Duration::from_secs(5) {
             app.save();
@@ -137,10 +143,12 @@ impl Running {
             library.restore(&Settings { playlist: Vec::new(), current: None, ..settings.clone() });
             library.add(paths, true);
         }
+        let now_playing = NowPlaying::new(main.window());
         let mut running = Running {
             instance,
             gpu,
             main,
+            now_playing,
             vis: None,
             library,
             feed: AudioFeed::default(),
@@ -239,7 +247,7 @@ fn main_window_attributes() -> WindowAttributes {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        attributes.with_decorations(false)
+        attributes.with_decorations(false).with_window_icon(window_icon())
     }
 }
 
@@ -252,4 +260,12 @@ fn on_screen(event_loop: &ActiveEventLoop, (x, y): (i32, i32)) -> bool {
             && x < origin.x + size.width as i32 - 50
             && y < origin.y + size.height as i32 - 50
     })
+}
+
+/// The app icon for the title bar and taskbar (macOS takes it from the bundle instead).
+#[cfg(not(target_os = "macos"))]
+fn window_icon() -> Option<winit::window::Icon> {
+    let image = image::load_from_memory(include_bytes!("../assets/icon.png")).ok()?.to_rgba8();
+    let (width, height) = image.dimensions();
+    winit::window::Icon::from_rgba(image.into_raw(), width, height).ok()
 }

@@ -5,9 +5,9 @@ reaches feature parity.
 
 | Crate | What it is | Ported from |
 |---|---|---|
-| `grimoire-core` | Playlist, m3u, FLAC tags, time math, spectrum and band analysis, three-body physics | `Sources/GrimoireCore` |
+| `grimoire-core` | Playlist, m3u, FLAC tags, time math, spectrum and band analysis, three-body physics, the Spellrun game and its pixel renderer | `Sources/GrimoireCore` |
 | `grimoire-audio` | symphonia decoding, rubato resampling, cpal output (CoreAudio / WASAPI), visualizer tap | `Sources/Grimoire/Audio` |
-| `grimoire-app` | winit window, wgpu scenes (Metal / Direct3D 12), the `--render-scene` tool | `Sources/Grimoire/UI/SceneWindow` |
+| `grimoire-app` | The terminal main window, the four wgpu scenes (Metal / Direct3D 12), media keys, settings, the render tools | `Sources/Grimoire/UI`, `Sources/Grimoire/Model` |
 
 ## Status
 - Milestone 1: core logic with all the Swift tests ported; playback of MP3, WAV, AIFF and FLAC with sample-accurate
@@ -16,7 +16,10 @@ reaches feature parity.
   scanlines, a beat-reactive glow) and holds the prompt (type to search, Enter plays), seek bar, spectrum,
   transport, volume, shuffle and repeat, and the playlist. Track changes play a rune glitch reveal. The visualizer
   is a second window you can toggle. Settings persist, and the first launch imports the Swift app's last playlist.
-- Not yet: Viewscreen, Spellrun and Splatter scenes; media keys and Now Playing; playlist reordering; packaging.
+- Milestone 3: all four visualizer scenes (Three-Body, Viewscreen, Spellrun, Splatter), switched with 1–4 or Tab in
+  the visualizer window; media keys and Now Playing (macOS Control Center, the Windows media overlay); dragging
+  playlist rows to reorder; packaging as a universal macOS DMG and a Windows zip with an embedded icon.
+- Not yet: Finder's "Open With" on macOS (winit doesn't deliver those events), a right-click scene menu, code signing.
 
 ## Use
 ```sh
@@ -27,13 +30,19 @@ cargo run --release -- --render-scene threeBody --track song.wav --out frames/ -
 Main window: type to search, Enter plays the match. Space play/pause, ←/→ seek (Shift for 30 s), ↑/↓ select,
 Delete removes, ⌘/Ctrl+←/→ previous/next, ⌘/Ctrl+O open, ⌘/Ctrl+V visualizer, ⌘/Ctrl+Q quit. Click or drag the seek
 bar and volume; scroll the list or the volume.
-Visualizer: R new orbit, M band meters, F or double-click for full screen.
+Visualizer: 1–4 or Tab switch scenes, R reseed, M band meters, F or double-click for full screen.
 
 Settings live in `~/Library/Application Support/Grimoire/settings.json` (macOS) or `%APPDATA%\Grimoire` (Windows).
 Set `GRIMOIRE_SETTINGS` to use a different file.
 
 Fonts: JetBrains Mono, with Noto Sans Runic, Symbols, Symbols 2 and Math as fallbacks, all under the SIL Open Font
 License (see `crates/grimoire-app/assets/fonts`).
+
+## Package
+```sh
+./scripts/package-macos.sh        # rs/dist/Grimoire-<version>.dmg, universal (NATIVE_ONLY=1 for this Mac only)
+```
+CI builds `Grimoire-windows-x64.zip` (exe, read-me, font licenses) and the DMG, and uploads both.
 
 ## Test
 ```sh
@@ -45,4 +54,10 @@ CI (`.github/workflows/rust.yml`) runs the tests on macOS and Windows and upload
 ## Checking against the Swift app
 Both apps share the `--render-scene` flags, so frames can be compared directly. For Three-Body on the same track
 they match to within about 1/255 for the first ~10 s. After that they drift apart, because the system is chaotic and
-the two FFT libraries round slightly differently. The look stays the same.
+the two FFT libraries round slightly differently. The look stays the same. The other scenes are random, so they're
+compared by eye and by overall brightness.
+
+One caveat: the Swift tool doesn't wait for the GPU between frames, so in Splatter (and probably Viewscreen) it
+overwrites stamp and star buffers before they're drawn and its frames come out darker than the live Swift app.
+Adding `commands.waitUntilCompleted()` after `commands.commit()` in `SceneRenderTool.swift` makes them match the
+Rust renders.

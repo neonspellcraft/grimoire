@@ -30,6 +30,8 @@ pub enum Request {
 enum Drag {
     Seek(CellRect),
     Volume(CellRect),
+    /// Reordering the playlist: the track being carried.
+    Row(TrackId),
 }
 
 pub struct MainWindow {
@@ -274,9 +276,11 @@ impl MainWindow {
         match self.drag {
             Some(Drag::Seek(rect)) => self.scrub = Some(self.fraction(rect)),
             Some(Drag::Volume(rect)) => library.set_volume(self.fraction(rect) as f32),
+            Some(Drag::Row(id)) => self.carry(id, library),
             None => {}
         }
         let icon = match (self.resize_edge(), self.action_under_pointer().map(|(a, _)| a)) {
+            _ if matches!(self.drag, Some(Drag::Row(_))) => CursorIcon::Grabbing,
             (Some(direction), _) => CursorIcon::from(direction),
             (None, Some(Action::Prompt)) => CursorIcon::Text,
             (None, Some(Action::Drag | Action::List) | None) => CursorIcon::Default,
@@ -325,12 +329,32 @@ impl MainWindow {
                     self.selected = Some(id);
                     if double {
                         library.play(id);
+                    } else if self.prompt.is_empty() {
+                        // Only the full list can be reordered; a filtered one would move tracks unpredictably.
+                        self.drag = Some(Drag::Row(id));
                     }
                 }
             }
             Action::List => self.selected = None,
         }
         None
+    }
+
+    /// While dragging a row, the carried track moves to whichever row is under the pointer.
+    fn carry(&mut self, id: TrackId, library: &mut Library) {
+        let Some((Action::Row(i), _)) = self.action_under_pointer() else { return };
+        let Some(&target) = self.visible.get(i) else { return };
+        let tracks = library.playlist.tracks();
+        let (Some(from), Some(to)) =
+            (tracks.iter().position(|t| t.id == id), tracks.iter().position(|t| t.id == target))
+        else {
+            return;
+        };
+        if from != to {
+            // `move_rows` takes the destination as an index before the move.
+            library.playlist.move_rows(&[from], if to > from { to + 1 } else { to });
+            library.dirty = true;
+        }
     }
 
     fn released(&mut self, library: &mut Library) {

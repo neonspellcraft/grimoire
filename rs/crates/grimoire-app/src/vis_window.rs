@@ -1,5 +1,6 @@
 //! The visualizer window (port of `SceneHostView`): one full-window scene driven by the shared audio feed.
-//! Drag to move, double-click for full screen; R new orbit, M band meters, F full screen, Space play/pause.
+//! Drag to move, double-click for full screen; 1–4 or Tab switch scenes, R reseed, M band meters, F full screen,
+//! Space play/pause.
 
 use std::time::{Duration, Instant};
 
@@ -27,12 +28,29 @@ pub struct Close;
 
 impl VisWindow {
     pub fn new(surface: WindowSurface, gpu: &Gpu, kind: SceneKind, show_meters: bool) -> Result<VisWindow, String> {
-        // Only Three-Body is ported so far; fall back to it for scenes saved by a newer build.
+        // Fall back to Three-Body if the saved scene can't be built (e.g. one from a newer build).
         let (kind, scene) = match kind.make(&gpu.device, surface.view_format) {
             Ok(scene) => (kind, scene),
             Err(_) => (SceneKind::ThreeBody, SceneKind::ThreeBody.make(&gpu.device, surface.view_format)?),
         };
+        surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
         Ok(VisWindow { surface, kind, scene, show_meters, last_frame: None, last_click: None, occluded: false })
+    }
+
+    /// Swaps in a fresh instance of `kind`; the old scene and its GPU resources are released.
+    fn select(&mut self, gpu: &Gpu, kind: SceneKind) {
+        if kind == self.kind {
+            return;
+        }
+        match kind.make(&gpu.device, self.surface.view_format) {
+            Ok(scene) => {
+                self.scene = scene;
+                self.kind = kind;
+                self.last_frame = None;
+                self.surface.window.set_title(&format!("Grimoire Visualizer — {}", kind.title()));
+            }
+            Err(e) => eprintln!("grimoire: couldn't build the {} scene: {e}", kind.title()),
+        }
     }
 
     pub fn draw(&mut self, gpu: &Gpu, feed: &AudioFeed) {
@@ -65,19 +83,23 @@ impl VisWindow {
                     let _ = self.surface.window.drag_window();
                 }
             }
-            WindowEvent::KeyboardInput { event, .. } => self.key(event, library),
+            WindowEvent::KeyboardInput { event, .. } => self.key(event, gpu, library),
             WindowEvent::DroppedFile(path) => library.add(vec![path.clone()], true),
             _ => {}
         }
         None
     }
 
-    fn key(&mut self, event: &KeyEvent, library: &mut Library) {
+    fn key(&mut self, event: &KeyEvent, gpu: &Gpu, library: &mut Library) {
         if event.state != ElementState::Pressed {
             return;
         }
         match &event.logical_key {
             Key::Named(NamedKey::Space) => library.toggle(),
+            Key::Named(NamedKey::Tab) => {
+                let index = SceneKind::ALL.iter().position(|&k| k == self.kind).unwrap_or(0);
+                self.select(gpu, SceneKind::ALL[(index + 1) % SceneKind::ALL.len()]);
+            }
             Key::Named(NamedKey::Escape) if self.surface.window.fullscreen().is_some() => {
                 self.surface.window.set_fullscreen(None)
             }
@@ -85,6 +107,10 @@ impl VisWindow {
                 "f" => self.toggle_fullscreen(),
                 "m" => self.show_meters = !self.show_meters,
                 "r" => self.scene.reseed(),
+                digit @ ("1" | "2" | "3" | "4") => {
+                    let index = digit.parse::<usize>().unwrap() - 1;
+                    self.select(gpu, SceneKind::ALL[index]);
+                }
                 _ => {}
             },
             _ => {}

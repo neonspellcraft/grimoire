@@ -9,6 +9,7 @@ pub mod multiband;
 pub mod playlist;
 pub mod power_spectrum;
 pub mod spectrum;
+pub mod spellrun;
 pub mod three_body;
 pub mod time_math;
 pub mod track;

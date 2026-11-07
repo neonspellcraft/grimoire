@@ -273,6 +273,16 @@ mod tests {
     }
 
     #[test]
+    fn dragging_a_row_up_or_down_lands_where_dropped() {
+        let mut p = make_playlist(5);
+        let ids = ids(&p);
+        p.move_rows(&[3], 1); // up: 3 lands at 1
+        assert_eq!(super::tests::ids(&p), [ids[0], ids[3], ids[1], ids[2], ids[4]]);
+        p.move_rows(&[1], 4); // down: index 1 lands at 3 (destination counts before the move)
+        assert_eq!(super::tests::ids(&p), [ids[0], ids[1], ids[2], ids[3], ids[4]]);
+    }
+
+    #[test]
     fn move_keeps_current_track() {
         let mut p = make_playlist(4);
         let ids = ids(&p);

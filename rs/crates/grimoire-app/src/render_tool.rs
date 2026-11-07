@@ -261,30 +261,36 @@ fn capture(gpu: &Gpu, target: &wgpu::Texture) -> Result<Vec<u8>, String> {
 mod tests {
     use super::*;
 
-    /// Renders Three-Body offscreen with a synthetic beat. Proves the WGSL compiles and draws something on
+    /// Renders every scene offscreen with a synthetic beat. Proves each WGSL shader compiles and draws something on
     /// whatever adapter the machine has (WARP on Windows CI). Skips if there's no adapter at all.
     #[test]
-    fn three_body_renders_offscreen() {
+    fn every_scene_renders_offscreen() {
         let rate = 44_100.0;
         let mono: Vec<f32> = (0..(rate as usize * 3))
             .map(|i| {
                 let t = i as f64 / rate;
                 let kick = if (t * 2.0).fract() < 0.1 { (2.0 * std::f64::consts::PI * 60.0 * t).sin() } else { 0.0 };
-                (0.4 * kick + 0.1 * (2.0 * std::f64::consts::PI * 440.0 * t).sin()) as f32
+                let hat = if (t * 8.0).fract() < 0.02 { fastrand::f64() * 2.0 - 1.0 } else { 0.0 };
+                (0.4 * kick + 0.1 * (2.0 * std::f64::consts::PI * 440.0 * t).sin() + 0.2 * hat) as f32
             })
             .collect();
-        let mut brightest = 0u8;
-        let result = render(SceneKind::ThreeBody, &mono, rate, 1.0, 320, 200, |_, rgba| {
-            brightest = brightest.max(rgba.chunks_exact(4).map(|p| p[0].max(p[1]).max(p[2])).max().unwrap_or(0));
-            Ok(())
-        });
-        match result {
-            Ok(frames) => {
-                assert!(frames > 100);
-                assert!(brightest > 40, "scene rendered black (max channel {brightest})");
+        for kind in SceneKind::ALL {
+            let mut brightest = 0u8;
+            let result = render(kind, &mono, rate, 1.0, 320, 200, |_, rgba| {
+                brightest = brightest.max(rgba.chunks_exact(4).map(|p| p[0].max(p[1]).max(p[2])).max().unwrap_or(0));
+                Ok(())
+            });
+            match result {
+                Ok(frames) => {
+                    assert!(frames > 100);
+                    assert!(brightest > 40, "{} rendered black (max channel {brightest})", kind.title());
+                }
+                Err(e) if e.starts_with("no graphics adapter") => {
+                    eprintln!("skipped: {e}");
+                    return;
+                }
+                Err(e) => panic!("{}: {e}", kind.title()),
             }
-            Err(e) if e.starts_with("no graphics adapter") => eprintln!("skipped: {e}"),
-            Err(e) => panic!("{e}"),
         }
     }
 }

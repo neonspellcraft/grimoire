@@ -18,7 +18,7 @@ jobs:
       run:
         working-directory: rs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -36,21 +36,35 @@ jobs:
         run: cargo run --release -- --render-ui ui-${{ runner.os }}.png
 
       - name: Upload UI sample
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ui-sample-${{ runner.os }}
           path: rs/ui-${{ runner.os }}.png
 
+      - name: Package Windows build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/Grimoire/licenses | Out-Null
+          Copy-Item target/release/grimoire.exe dist/Grimoire/
+          Copy-Item packaging/windows/README.txt dist/Grimoire/
+          Copy-Item crates/grimoire-app/assets/fonts/*-OFL.txt dist/Grimoire/licenses/
+          Compress-Archive -Path dist/Grimoire -DestinationPath dist/Grimoire-windows-x64.zip -Force
+
       - name: Upload Windows build
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: grimoire-windows-x64
-          path: rs/target/release/grimoire.exe
+          path: rs/dist/Grimoire-windows-x64.zip
+
+      - name: Package macOS build
+        if: runner.os == 'macOS'
+        run: ./scripts/package-macos.sh
 
       - name: Upload macOS build
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: grimoire-macos-arm64
-          path: rs/target/release/grimoire
+          name: grimoire-macos
+          path: rs/dist/*.dmg

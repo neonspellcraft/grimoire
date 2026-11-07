@@ -1,10 +1,16 @@
 //! Full-window GPU visualizer scenes (port of `Sources/Grimoire/UI/SceneWindow`).
 
+mod splatter;
+mod spellrun;
 mod three_body;
+mod viewscreen;
 
 use grimoire_core::BandLevels;
 
+pub use spellrun::SpellrunScene;
+pub use splatter::SplatterScene;
 pub use three_body::ThreeBodyScene;
+pub use viewscreen::ViewscreenScene;
 
 /// What every window scene gets each frame: the three bands, smoothed and auto-gained, plus transient hits.
 #[derive(Clone, Copy, Debug, Default)]
@@ -68,7 +74,9 @@ impl SceneKind {
     pub fn make(self, device: &wgpu::Device, format: wgpu::TextureFormat) -> Result<Box<dyn WindowScene>, String> {
         match self {
             SceneKind::ThreeBody => Ok(Box::new(ThreeBodyScene::new(device, format))),
-            other => Err(format!("{} isn't ported to the cross-platform build yet", other.title())),
+            SceneKind::Viewscreen => Ok(Box::new(ViewscreenScene::new(device, format))),
+            SceneKind::Splatter => Ok(Box::new(SplatterScene::new(device, format))),
+            SceneKind::Spellrun => Ok(Box::new(SpellrunScene::new(device, format))),
         }
     }
 }
